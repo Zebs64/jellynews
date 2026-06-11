@@ -1,0 +1,11 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+jinja2>=3.1,<4
+httpx>=0.28,<1
+apscheduler>=3.11,<4
+itsdangerous>=2.2,<3
+bcrypt>=4.2,<5
+python-multipart>=0.0.20
+# Base de données IANA des fuseaux horaires : garantit que zoneinfo fonctionne
+# même dans l'image slim (qui n'embarque pas toujours le paquet système tzdata).
+tzdata>=2024.1

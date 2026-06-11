@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JellyNews — Désinscription</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <h1>🪼 JellyNews</h1>
+    {% if ok %}
+    <p class="subtitle">✅ Désinscription confirmée</p>
+    {% else %}
+    <p class="error">⚠️ {{ message }}</p>
+    {% endif %}
+    {% if ok %}<p>{{ message }}</p>{% endif %}
+  </div>
+</body>
+</html>

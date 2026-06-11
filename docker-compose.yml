@@ -1,0 +1,17 @@
+services:
+  jellynews:
+    build: .
+    container_name: jellynews
+    restart: unless-stopped
+    ports:
+      - "8050:8000"          # http://localhost:8050
+    environment:
+      # Fuseau par défaut ; modifiable ensuite dans l'interface (Planification).
+      - TZ=Europe/Paris
+      - DATA_DIR=/data
+    volumes:
+      # Tout l'état persistant (SQLite, logo uploadé, clé secrète de session)
+      # vit dans /data : on peut détruire/reconstruire le conteneur sans perte.
+      - ./data:/data
+      # Optionnel : décommentez pour personnaliser le template email sans rebuild.
+      # - ./app/templates/email:/srv/app/templates/email:ro
