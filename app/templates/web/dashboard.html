@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JellyNews — Administration</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>🪼 JellyNews</h1>
+    <nav>
+      <button class="nav-btn active" data-panel="panel-jellyfin">Jellyfin</button>
+      <button class="nav-btn" data-panel="panel-smtp">SMTP</button>
+      <button class="nav-btn" data-panel="panel-llm">IA / LLM</button>
+      <button class="nav-btn" data-panel="panel-schedule">Planification</button>
+      <button class="nav-btn" data-panel="panel-discord">Discord</button>
+      <button class="nav-btn" data-panel="panel-branding">Apparence</button>
+      <button class="nav-btn" data-panel="panel-subscribers">Abonnés</button>
+      <button class="nav-btn" data-panel="panel-actions">Envoi &amp; Logs</button>
+      <button class="nav-btn" data-panel="panel-security">Sécurité</button>
+      <button class="nav-btn" data-panel="panel-backup">Sauvegarde</button>
+    </nav>
+    <div class="sidebar-footer">
+      <span>Connecté : {{ user }}</span>
+      <a href="/logout">Déconnexion</a>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- ============================== Jellyfin ============================ -->
+    <section id="panel-jellyfin" class="panel">
+      <h2>Serveur Jellyfin</h2>
+      <form class="settings-form" data-keys="jellyfin_url,jellyfin_api_key,jellyfin_external_url,lookback_days,poster_mode,library_ids">
+        <label>URL du serveur (interne)
+          <input type="url" name="jellyfin_url" placeholder="http://jellyfin:8096">
+        </label>
+        <label>Clé API Jellyfin
+          <input type="password" name="jellyfin_api_key" autocomplete="off">
+          <small>Tableau de bord Jellyfin → API Keys</small>
+        </label>
+        <label>URL publique (pour les affiches dans l'email)
+          <input type="url" name="jellyfin_external_url" placeholder="https://jellyfin.mondomaine.fr">
+          <small>Doit être joignable depuis Internet, sinon les posters seront cassés chez les abonnés.</small>
+        </label>
+        <label>Période analysée (jours)
+          <input type="number" name="lookback_days" min="1" max="60">
+        </label>
+        <label>Affiches dans l'email
+          <select name="poster_mode">
+            <option value="embed">Incorporées à l'email (recommandé, pas besoin d'URL publique)</option>
+            <option value="link">Liens vers le serveur (email plus léger, Jellyfin public requis)</option>
+          </select>
+        </label>
+        <label>Bibliothèques incluses
+          <input type="hidden" name="library_ids">
+          <div id="libraries-box" class="checkbox-list"><em>Cliquez sur « Charger » pour lister les bibliothèques.</em></div>
+          <small>Aucune case cochée = toutes les bibliothèques.</small>
+        </label>
+        <div class="row">
+          <button type="submit" class="btn primary">Enregistrer</button>
+          <button type="button" class="btn" id="btn-test-jellyfin">Tester la connexion</button>
+          <button type="button" class="btn" id="btn-load-libraries">Charger les bibliothèques</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ================================ SMTP ============================== -->
+    <section id="panel-smtp" class="panel hidden">
+      <h2>Serveur SMTP</h2>
+      <form class="settings-form" data-keys="smtp_host,smtp_port,smtp_security,smtp_user,smtp_password,smtp_sender">
+        <div class="grid-2">
+          <label>Hôte
+            <input type="text" name="smtp_host" placeholder="smtp.exemple.fr">
+          </label>
+          <label>Port
+            <input type="number" name="smtp_port" min="1" max="65535">
+          </label>
+        </div>
+        <label>Sécurité
+          <select name="smtp_security">
+            <option value="starttls">STARTTLS (port 587)</option>
+            <option value="ssl">SSL/TLS implicite (port 465)</option>
+            <option value="none">Aucune (déconseillé)</option>
+          </select>
+        </label>
+        <div class="grid-2">
+          <label>Utilisateur
+            <input type="text" name="smtp_user" autocomplete="off">
+          </label>
+          <label>Mot de passe
+            <input type="password" name="smtp_password" autocomplete="off">
+          </label>
+        </div>
+        <label>Expéditeur (From)
+          <input type="email" name="smtp_sender" placeholder="newsletter@mondomaine.fr">
+        </label>
+        <div class="row">
+          <button type="submit" class="btn primary">Enregistrer</button>
+          <input type="email" id="test-email-to" placeholder="adresse@test.fr" class="inline-input">
+          <button type="button" class="btn" id="btn-test-email">Envoyer un email de test</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ================================ LLM =============================== -->
+    <section id="panel-llm" class="panel hidden">
+      <h2>Intelligence artificielle (intro humoristique)</h2>
+      <form class="settings-form" data-keys="llm_api_url,llm_api_key,llm_model,llm_prompt">
+        <label>URL de l'API (compatible OpenAI)
+          <input type="url" name="llm_api_url" placeholder="https://openrouter.ai/api/v1">
+          <small>OpenRouter : https://openrouter.ai/api/v1 — OpenAI : https://api.openai.com/v1</small>
+        </label>
+        <div class="grid-2">
+          <label>Clé API
+            <input type="password" name="llm_api_key" autocomplete="off">
+          </label>
+          <label>Modèle
+            <input type="text" name="llm_model" placeholder="openai/gpt-4o-mini">
+          </label>
+        </div>
+        <label>Prompt de base (ton humoristique)
+          <textarea name="llm_prompt" rows="6"></textarea>
+        </label>
+        <div class="row">
+          <button type="submit" class="btn primary">Enregistrer</button>
+          <button type="button" class="btn" id="btn-test-llm">Tester (générer une intro)</button>
+        </div>
+        <blockquote id="llm-test-result" class="hidden"></blockquote>
+      </form>
+    </section>
+
+    <!-- ============================ Planification ========================= -->
+    <section id="panel-schedule" class="panel hidden">
+      <h2>Planification de l'envoi</h2>
+      <form class="settings-form" data-keys="schedule_enabled,schedule_day,schedule_hour,schedule_minute,timezone">
+        <label class="checkbox">
+          <input type="checkbox" name="schedule_enabled" value="1">
+          Activer l'envoi automatique hebdomadaire
+        </label>
+        <div class="grid-3">
+          <label>Jour
+            <select name="schedule_day">
+              <option value="0">Lundi</option><option value="1">Mardi</option>
+              <option value="2">Mercredi</option><option value="3">Jeudi</option>
+              <option value="4">Vendredi</option><option value="5">Samedi</option>
+              <option value="6">Dimanche</option>
+            </select>
+          </label>
+          <label>Heure
+            <input type="number" name="schedule_hour" min="0" max="23">
+          </label>
+          <label>Minute
+            <input type="number" name="schedule_minute" min="0" max="59">
+          </label>
+        </div>
+        <label>Fuseau horaire
+          <input type="text" name="timezone" list="tz-list" placeholder="Europe/Paris">
+          <datalist id="tz-list"></datalist>
+          <small>Fuseau utilisé pour l'heure d'envoi (format IANA, ex. Europe/Paris).</small>
+        </label>
+        <p class="info">Prochain envoi : <strong id="next-run">—</strong></p>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </form>
+    </section>
+
+    <!-- =============================== Discord ============================ -->
+    <section id="panel-discord" class="panel hidden">
+      <h2>Webhook Discord (optionnel)</h2>
+      <form class="settings-form" data-keys="discord_webhook_url">
+        <label>URL du webhook
+          <input type="url" name="discord_webhook_url" placeholder="https://discord.com/api/webhooks/…">
+          <small>Laissez vide pour désactiver. Un résumé est posté à chaque envoi de newsletter.</small>
+        </label>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </form>
+    </section>
+
+    <!-- ============================== Apparence =========================== -->
+    <section id="panel-branding" class="panel hidden">
+      <h2>Apparence de la newsletter</h2>
+      <form class="settings-form" data-keys="newsletter_title,app_public_url">
+        <label>Titre de la newsletter
+          <input type="text" name="newsletter_title">
+        </label>
+        <label>URL publique de JellyNews (lien de désinscription)
+          <input type="url" name="app_public_url" placeholder="https://jellynews.mondomaine.fr">
+          <small>Sert à construire le lien « Se désinscrire » dans les emails. Vide = pas de lien.</small>
+        </label>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </form>
+      <h3>Logo personnalisé</h3>
+      <div class="logo-zone">
+        <img id="logo-preview" src="" alt="Aucun logo" class="hidden">
+        <form id="logo-form">
+          <input type="file" id="logo-file" accept=".png,.jpg,.jpeg,.gif,.webp">
+          <button type="submit" class="btn">Uploader le logo</button>
+        </form>
+        <small>PNG/JPG/GIF/WebP, 2 Mo max. Affiché en haut de la newsletter (incorporé à l'email).</small>
+      </div>
+    </section>
+
+    <!-- =============================== Abonnés ============================ -->
+    <section id="panel-subscribers" class="panel hidden">
+      <h2>Abonnés</h2>
+      <form id="subscriber-form" class="row">
+        <input type="email" id="subscriber-email" placeholder="nouvel.abonne@exemple.fr" required class="inline-input">
+        <button type="submit" class="btn primary">Ajouter</button>
+      </form>
+      <table class="data-table">
+        <thead><tr><th>Email</th><th>Inscrit le</th><th></th></tr></thead>
+        <tbody id="subscribers-body"></tbody>
+      </table>
+      <h3>Import / Export</h3>
+      <div class="row">
+        <a class="btn" href="/api/subscribers/export">⬇ Exporter en CSV</a>
+        <input type="file" id="subscribers-file" accept=".csv,.txt" class="inline-input">
+        <button type="button" class="btn" id="btn-import-subscribers">⬆ Importer un CSV</button>
+      </div>
+    </section>
+
+    <!-- ============================ Envoi & Logs ========================== -->
+    <section id="panel-actions" class="panel hidden">
+      <h2>Envoi &amp; historique</h2>
+      <div class="row">
+        <button class="btn" id="btn-preview">👁 Prévisualiser la newsletter</button>
+        <button class="btn primary" id="btn-send-now">📨 Envoyer maintenant</button>
+      </div>
+      <h3>Historique des envois</h3>
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Déclencheur</th><th>Statut</th><th>Médias</th><th>Envoyés</th><th>Détail</th></tr></thead>
+        <tbody id="logs-body"></tbody>
+      </table>
+      <h3>Archives des newsletters</h3>
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Sujet</th><th>Médias</th><th>Envoyés</th><th></th></tr></thead>
+        <tbody id="archives-body"></tbody>
+      </table>
+    </section>
+
+    <!-- =============================== Sécurité =========================== -->
+    <section id="panel-security" class="panel hidden">
+      <h2>Sécurité &amp; reverse-proxy</h2>
+      <form class="settings-form" data-keys="behind_proxy,trusted_proxies,cookie_secure">
+        <label class="checkbox">
+          <input type="checkbox" name="behind_proxy" value="1">
+          JellyNews est derrière un reverse-proxy (Nginx, Traefik, Caddy…)
+        </label>
+        <p class="info">Active la lecture de l'en-tête <code>X-Forwarded-For</code> pour que
+          l'anti-brute-force du login voie l'adresse IP réelle des visiteurs et non celle du proxy.</p>
+        <label>Proxys de confiance (IP ou CIDR, séparés par des virgules)
+          <input type="text" name="trusted_proxies" placeholder="172.18.0.0/16, 10.0.0.5">
+          <small>L'en-tête n'est cru que s'il provient de ces adresses. Vide = confiance au pair
+            direct, acceptable uniquement si seul le proxy peut joindre le conteneur
+            (ex. réseau Docker interne, port non publié).</small>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="cookie_secure" value="1">
+          Cookie de session « Secure » (à activer si l'interface est servie en HTTPS)
+        </label>
+        <p class="info">⚠️ N'activez « Secure » qu'en HTTPS : en HTTP simple, le navigateur
+          refusera le cookie et la connexion deviendra impossible.</p>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </form>
+    </section>
+
+    <!-- ============================== Sauvegarde ========================== -->
+    <section id="panel-backup" class="panel hidden">
+      <h2>Sauvegarde de la configuration</h2>
+      <p class="info">⚠️ Le fichier exporté contient vos secrets (mot de passe SMTP, clés API) : stockez-le en lieu sûr.</p>
+      <div class="row">
+        <a class="btn" href="/api/settings/export">⬇ Exporter la configuration (JSON)</a>
+      </div>
+      <div class="row">
+        <input type="file" id="settings-file" accept=".json" class="inline-input">
+        <button type="button" class="btn" id="btn-import-settings">⬆ Importer une configuration</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
