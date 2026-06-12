@@ -36,12 +36,27 @@ avec en option un résumé sur Discord.
 
 ### Méthode 1 — Image pré-buildée (GHCR)
 
-```bash
-curl -O https://raw.githubusercontent.com/Zebs64/jellynews/main/docker-compose-example.yml
-docker compose -f docker-compose-example.yml up -d
+Créez un `docker-compose.yml` :
+
+```yaml
+services:
+  jellynews:
+    image: ghcr.io/zebs64/jellynews:latest
+    container_name: jellynews
+    restart: unless-stopped
+    ports:
+      - "8050:8000"
+    environment:
+      - TZ=Europe/Paris
+      - DATA_DIR=/data
+    volumes:
+      - ./data:/data
 ```
 
-L'image est tirée depuis `ghcr.io/zebs64/jellynews:latest`.
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ### Méthode 2 — Build depuis la source
 
