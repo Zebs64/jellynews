@@ -1,0 +1,20 @@
+# docker-compose-example.yml — Utilise l'image pré-buildée depuis GitHub Container Registry.
+# Copiez ce fichier en docker-compose.yml et adaptez le port si besoin.
+#
+# docker compose -f docker-compose-example.yml up -d
+
+services:
+  jellynews:
+    image: ghcr.io/zebs64/jellynews:latest
+    container_name: jellynews
+    restart: unless-stopped
+    ports:
+      - "8050:8000"          # http://localhost:8050
+    environment:
+      # Fuseau par défaut ; modifiable ensuite dans l'interface (Planification).
+      - TZ=Europe/Paris
+      - DATA_DIR=/data
+    volumes:
+      # Tout l'état persistant (SQLite, logo uploadé, clé secrète de session)
+      # vit dans /data : on peut détruire/reconstruire le conteneur sans perte.
+      - ./data:/data
