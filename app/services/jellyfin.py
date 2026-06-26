@@ -8,6 +8,25 @@ import httpx
 
 log = logging.getLogger("jellynews.jellyfin")
 
+JELLYFIN_CLIENT = "JellyNews"
+JELLYFIN_DEVICE = "JellyNews"
+JELLYFIN_DEVICE_ID = "jellynews"
+JELLYFIN_CLIENT_VERSION = "1.0.1"
+
+
+def _jellyfin_headers(settings: dict) -> dict[str, str]:
+    api_key = settings.get("jellyfin_api_key")
+    if not api_key:
+        raise RuntimeError("URL Jellyfin ou clé API non configurée")
+    authorization = (
+        f' MediaBrowser Client="{JELLYFIN_CLIENT}",'
+        f' Device="{JELLYFIN_DEVICE}",'
+        f' DeviceId="{JELLYFIN_DEVICE_ID}",'
+        f' Version="{JELLYFIN_CLIENT_VERSION}",'
+        f' Token="{api_key}"'
+    ).strip()
+    return {"Authorization": authorization}
+
 
 def _get(settings: dict, path: str, params: dict | None = None) -> httpx.Response:
     base = settings["jellyfin_url"].rstrip("/")
@@ -15,7 +34,7 @@ def _get(settings: dict, path: str, params: dict | None = None) -> httpx.Respons
         raise RuntimeError("URL Jellyfin ou clé API non configurée")
     resp = httpx.get(
         f"{base}{path}",
-        headers={"X-Emby-Token": settings["jellyfin_api_key"]},
+        headers=_jellyfin_headers(settings),
         params=params,
         timeout=30,
     )
@@ -96,7 +115,7 @@ def download_poster(settings: dict, item: dict) -> tuple[bytes, str] | None:
         return None
     try:
         resp = httpx.get(
-            url, headers={"X-Emby-Token": settings["jellyfin_api_key"]}, timeout=30
+            url, headers=_jellyfin_headers(settings), timeout=30
         )
         resp.raise_for_status()
         content_type = resp.headers.get("content-type", "image/jpeg")
