@@ -1,5 +1,7 @@
 """API d'administration (toutes les routes exigent une session valide)."""
 import csv
+import datetime
+import html
 import io
 import ipaddress
 import json
@@ -42,6 +44,125 @@ def _validate_settings(payload: dict) -> None:
                 ipaddress.ip_network(entry, strict=False)
             except ValueError:
                 raise HTTPException(400, f"IP ou CIDR invalide : {entry}")
+
+
+def _parse_iso_datetime(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPException(400, f"Champ datetime invalide : {field}")
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        datetime.datetime.fromisoformat(normalized)
+    except ValueError:
+        raise HTTPException(400, f"Champ datetime invalide : {field}")
+    return value.strip()
+
+
+def _int_non_negative(value: object, field: str) -> int:
+    try:
+        number = int(str(value))
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"Champ numérique invalide : {field}")
+    if number < 0:
+        raise HTTPException(400, f"Champ numérique invalide : {field}")
+    return number
+
+
+def _text(value: object, field: str, *, required: bool = True) -> str:
+    if value is None and not required:
+        return ""
+    if not isinstance(value, str):
+        raise HTTPException(400, f"Champ texte invalide : {field}")
+    if required and not value.strip():
+        raise HTTPException(400, f"Champ texte invalide : {field}")
+    return value
+
+
+def _normalize_settings(payload: object) -> dict:
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "La section settings doit être un objet JSON")
+    known = {k: v for k, v in payload.items() if k in database.DEFAULTS}
+    _validate_settings(known)
+    return known
+
+
+def _normalize_subscribers(payload: object) -> list[dict]:
+    if not isinstance(payload, list):
+        raise HTTPException(400, "La section subscribers doit être une liste")
+    now = datetime.datetime.now().isoformat(timespec="seconds")
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    for index, row in enumerate(payload):
+        if not isinstance(row, dict):
+            raise HTTPException(400, f"Abonné invalide à l'index {index}")
+        email = str(row.get("email") or "").strip().lower()
+        if not EMAIL_RE.match(email):
+            raise HTTPException(400, f"Adresse email invalide à l'index {index}")
+        created_at = row.get("created_at") or now
+        if created_at != now:
+            created_at = _parse_iso_datetime(created_at, f"subscribers[{index}].created_at")
+        if email in seen:
+            continue
+        seen.add(email)
+        normalized.append({"email": email, "created_at": created_at})
+    return normalized
+
+
+def _normalize_send_logs(payload: object) -> list[dict]:
+    if not isinstance(payload, list):
+        raise HTTPException(400, "La section send_logs doit être une liste")
+    normalized: list[dict] = []
+    for index, row in enumerate(payload):
+        if not isinstance(row, dict):
+            raise HTTPException(400, f"Entrée send_logs invalide à l'index {index}")
+        normalized.append({
+            "created_at": _parse_iso_datetime(row.get("created_at"), f"send_logs[{index}].created_at"),
+            "trigger": _text(row.get("trigger"), f"send_logs[{index}].trigger"),
+            "status": _text(row.get("status"), f"send_logs[{index}].status"),
+            "items_count": _int_non_negative(row.get("items_count", 0), f"send_logs[{index}].items_count"),
+            "recipients": _int_non_negative(row.get("recipients", 0), f"send_logs[{index}].recipients"),
+            "detail": _text(row.get("detail", ""), f"send_logs[{index}].detail", required=False)[:2000],
+        })
+    return normalized
+
+
+def _normalize_archives(payload: object) -> list[dict]:
+    if not isinstance(payload, list):
+        raise HTTPException(400, "La section archives doit être une liste")
+    normalized: list[dict] = []
+    for index, row in enumerate(payload):
+        if not isinstance(row, dict):
+            raise HTTPException(400, f"Archive invalide à l'index {index}")
+        source_html = _text(row.get("html"), f"archives[{index}].html")
+        normalized.append({
+            "created_at": _parse_iso_datetime(row.get("created_at"), f"archives[{index}].created_at"),
+            "subject": _text(row.get("subject"), f"archives[{index}].subject"),
+            "items_count": _int_non_negative(row.get("items_count", 0), f"archives[{index}].items_count"),
+            "recipients": _int_non_negative(row.get("recipients", 0), f"archives[{index}].recipients"),
+            "html": html.escape(html.unescape(source_html), quote=False),
+            "_source_html": source_html,
+        })
+    return normalized
+
+
+def _prepare_backup_import(payload: dict) -> dict:
+    if "schema_version" not in payload:
+        return {
+            "settings": _normalize_settings(payload),
+            "subscribers": [],
+            "send_logs": [],
+            "archives": [],
+        }
+    schema_version = payload.get("schema_version")
+    if schema_version not in (2, "2"):
+        raise HTTPException(400, f"Schéma de sauvegarde non supporté : {schema_version}")
+    nested = payload.get("data")
+    source = nested if isinstance(nested, dict) else payload
+    return {
+        "settings": _normalize_settings(source.get("settings", {})),
+        "subscribers": _normalize_subscribers(source.get("subscribers", [])),
+        "send_logs": _normalize_send_logs(source.get("send_logs", [])),
+        "archives": _normalize_archives(source.get("archives", [])),
+    }
 
 
 @router.post("/settings")
@@ -134,9 +255,9 @@ def list_logs():
 def export_settings():
     """ATTENTION : le fichier exporté contient les secrets (SMTP, clés API)."""
     return Response(
-        json.dumps(database.get_settings(), indent=2, ensure_ascii=False),
+        json.dumps(database.export_backup(jellyfin.JELLYFIN_CLIENT_VERSION), indent=2, ensure_ascii=False),
         media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=jellynews-config.json"},
+        headers={"Content-Disposition": "attachment; filename=jellynews-backup-v1.0.2-secrets.json"},
     )
 
 
@@ -148,11 +269,10 @@ async def import_settings(file: UploadFile = File(...)):
             raise ValueError("le fichier doit contenir un objet JSON")
     except (ValueError, UnicodeDecodeError) as exc:
         raise HTTPException(400, f"JSON invalide : {exc}")
-    known = {k: v for k, v in payload.items() if k in database.DEFAULTS}
-    _validate_settings(known)
-    database.set_settings(known)  # filtré par la liste blanche DEFAULTS
+    backup_data = _prepare_backup_import(payload)
+    result = database.import_backup_data(backup_data)
     scheduler.reschedule()
-    return {"ok": True, "imported": len(known)}
+    return {"ok": True, **result}
 
 
 # ---------------------------------------------------------------- archives --

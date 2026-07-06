@@ -9,7 +9,13 @@
 <body>
 <div class="layout">
   <aside class="sidebar">
-    <h1>🪼 JellyNews</h1>
+    <div class="brand-lockup">
+      <img class="brand-mark" src="/static/brand/jellynews-mark.svg" alt="" aria-hidden="true">
+      <div class="brand-text">
+        <span class="brand-name">JellyNews</span>
+        <span class="brand-subtitle">Media digest</span>
+      </div>
+    </div>
     <nav>
       <button class="nav-btn active" data-panel="panel-jellyfin">Jellyfin</button>
       <button class="nav-btn" data-panel="panel-smtp">SMTP</button>
@@ -33,7 +39,10 @@
 
     <!-- ============================== Jellyfin ============================ -->
     <section id="panel-jellyfin" class="panel">
-      <h2>Serveur Jellyfin</h2>
+      <div class="panel-heading">
+        <h2>Serveur Jellyfin</h2>
+        <p>Connectez votre médiathèque et choisissez ce qui entre dans le courant hebdomadaire.</p>
+      </div>
       <form class="settings-form" data-keys="jellyfin_url,jellyfin_api_key,jellyfin_external_url,lookback_days,poster_mode,library_ids">
         <label>URL du serveur (interne)
           <input type="url" name="jellyfin_url" placeholder="http://jellyfin:8096">
@@ -205,15 +214,20 @@
 
     <!-- =============================== Abonnés ============================ -->
     <section id="panel-subscribers" class="panel hidden">
-      <h2>Abonnés</h2>
+      <div class="panel-heading">
+        <h2>Abonnés</h2>
+        <p>Les destinataires de la newsletter et l’import CSV historique restent disponibles ici.</p>
+      </div>
       <form id="subscriber-form" class="row">
         <input type="email" id="subscriber-email" placeholder="nouvel.abonne@exemple.fr" required class="inline-input">
         <button type="submit" class="btn primary">Ajouter</button>
       </form>
-      <table class="data-table">
-        <thead><tr><th>Email</th><th>Inscrit le</th><th></th></tr></thead>
-        <tbody id="subscribers-body"></tbody>
-      </table>
+      <div class="table-shell">
+        <table class="data-table">
+          <thead><tr><th>Email</th><th>Inscrit le</th><th></th></tr></thead>
+          <tbody id="subscribers-body"></tbody>
+        </table>
+      </div>
       <h3>Import / Export</h3>
       <div class="row">
         <a class="btn" href="/api/subscribers/export">⬇ Exporter en CSV</a>
@@ -224,21 +238,28 @@
 
     <!-- ============================ Envoi & Logs ========================== -->
     <section id="panel-actions" class="panel hidden">
-      <h2>Envoi &amp; historique</h2>
+      <div class="panel-heading">
+        <h2>Envoi &amp; historique</h2>
+        <p>Prévisualisez, envoyez, puis vérifiez les statuts et archives de newsletters.</p>
+      </div>
       <div class="row">
         <button class="btn" id="btn-preview">👁 Prévisualiser la newsletter</button>
         <button class="btn primary" id="btn-send-now">📨 Envoyer maintenant</button>
       </div>
       <h3>Historique des envois</h3>
-      <table class="data-table">
-        <thead><tr><th>Date</th><th>Déclencheur</th><th>Statut</th><th>Médias</th><th>Envoyés</th><th>Détail</th></tr></thead>
-        <tbody id="logs-body"></tbody>
-      </table>
+      <div class="table-shell">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Déclencheur</th><th>Statut</th><th>Médias</th><th>Envoyés</th><th>Détail</th></tr></thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
       <h3>Archives des newsletters</h3>
-      <table class="data-table">
-        <thead><tr><th>Date</th><th>Sujet</th><th>Médias</th><th>Envoyés</th><th></th></tr></thead>
-        <tbody id="archives-body"></tbody>
-      </table>
+      <div class="table-shell">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Sujet</th><th>Médias</th><th>Envoyés</th><th></th></tr></thead>
+          <tbody id="archives-body"></tbody>
+        </table>
+      </div>
     </section>
 
     <!-- =============================== Sécurité =========================== -->
@@ -269,15 +290,19 @@
 
     <!-- ============================== Sauvegarde ========================== -->
     <section id="panel-backup" class="panel hidden">
-      <h2>Sauvegarde de la configuration</h2>
-      <p class="info">⚠️ Le fichier exporté contient vos secrets (mot de passe SMTP, clés API) : stockez-le en lieu sûr.</p>
+      <div class="panel-heading">
+        <h2>Sauvegarde complète</h2>
+        <p>Export v1.0.2 : configuration, abonnés, historique des envois et archives de newsletters.</p>
+      </div>
+      <p class="info">⚠️ Le fichier exporté contient vos secrets (mot de passe SMTP, clés API Jellyfin/LLM) : stockez-le en lieu sûr.</p>
       <div class="row">
-        <a class="btn" href="/api/settings/export">⬇ Exporter la configuration (JSON)</a>
+        <a class="btn primary" href="/api/settings/export">⬇ Exporter la sauvegarde complète (JSON)</a>
       </div>
       <div class="row">
         <input type="file" id="settings-file" accept=".json" class="inline-input">
-        <button type="button" class="btn" id="btn-import-settings">⬆ Importer une configuration</button>
+        <button type="button" class="btn" id="btn-import-settings">⬆ Importer une sauvegarde</button>
       </div>
+      <p class="info">Import fusionnel par défaut : les abonnés, logs et archives existants ne sont pas supprimés ; les doublons sont ignorés.</p>
     </section>
   </main>
 </div>

@@ -11,7 +11,7 @@ log = logging.getLogger("jellynews.jellyfin")
 JELLYFIN_CLIENT = "JellyNews"
 JELLYFIN_DEVICE = "JellyNews"
 JELLYFIN_DEVICE_ID = "jellynews"
-JELLYFIN_CLIENT_VERSION = "1.0.1"
+JELLYFIN_CLIENT_VERSION = "1.0.2"
 
 
 def _jellyfin_headers(settings: dict) -> dict[str, str]:

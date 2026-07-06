@@ -113,6 +113,27 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function emptyRow(cols, message) {
+  return `<tr><td colspan="${cols}"><div class="empty-state compact">${escapeHtml(message)}</div></td></tr>`;
+}
+
+function importSummary(result) {
+  const imported = result.imported || {};
+  const skipped = result.skipped || {};
+  const parts = [
+    `${imported.settings || 0} paramètre(s)`,
+    `${imported.subscribers || 0} abonné(s)`,
+    `${imported.send_logs || 0} log(s)`,
+    `${imported.archives || 0} archive(s)`,
+  ];
+  const skippedTotal = (skipped.subscribers || 0) + (skipped.send_logs || 0) + (skipped.archives || 0);
+  return `Sauvegarde importée : ${parts.join(', ')}${skippedTotal ? ` — ${skippedTotal} doublon(s) ignoré(s)` : ''} ✔`;
+}
+
+function statusClass(value) {
+  return String(value || 'unknown').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+}
+
 async function loadSubscribers() {
   const subs = await (await api('/api/subscribers')).json();
   $('#subscribers-body').innerHTML = subs.map((s) => `
@@ -120,7 +141,7 @@ async function loadSubscribers() {
       <td>${escapeHtml(s.email)}</td>
       <td>${escapeHtml((s.created_at || '').replace('T', ' '))}</td>
       <td><button class="btn danger" data-del="${s.id}">Supprimer</button></td>
-    </tr>`).join('') || '<tr><td colspan="3">Aucun abonné pour le moment.</td></tr>';
+    </tr>`).join('') || emptyRow(3, 'Aucun abonné pour le moment.');
 }
 
 $('#subscriber-form').addEventListener('submit', async (event) => {
@@ -159,16 +180,30 @@ $('#btn-load-libraries').addEventListener('click', (e) =>
     try {
       const libs = await (await api('/api/jellyfin/libraries')).json();
       const current = $('input[name="library_ids"]').value.split(',').filter(Boolean);
-      $('#libraries-box').innerHTML = libs.map((lib) => `
-        <label class="checkbox">
-          <input type="checkbox" value="${escapeHtml(lib.id)}"
-                 ${current.includes(lib.id) ? 'checked' : ''}>
-          ${escapeHtml(lib.name)}
-        </label>`).join('') || '<em>Aucune bibliothèque trouvée.</em>';
-      $$('#libraries-box input').forEach((cb) =>
-        cb.addEventListener('change', () => {
+      const box = $('#libraries-box');
+      box.textContent = '';
+      if (!libs.length) {
+        const empty = document.createElement('em');
+        empty.textContent = 'Aucune bibliothèque trouvée.';
+        box.append(empty);
+        return;
+      }
+      libs.forEach((lib) => {
+        const id = String(lib.id || '');
+        const label = document.createElement('label');
+        label.className = 'checkbox';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = id;
+        input.checked = current.includes(id);
+        input.addEventListener('change', () => {
           $('input[name="library_ids"]').value = selectedLibraryIds();
-        }));
+        });
+
+        label.append(input, document.createTextNode(' ' + String(lib.name || '')));
+        box.append(label);
+      });
     } catch (err) {
       toast('Erreur : ' + err.message, true);
     }
@@ -213,12 +248,12 @@ $('#btn-import-subscribers').addEventListener('click', (e) =>
   }));
 
 $('#btn-import-settings').addEventListener('click', (e) => {
-  if (!confirm('Écraser la configuration actuelle avec ce fichier ?')) return;
+  if (!confirm('Importer cette sauvegarde complète ? Les données existantes seront fusionnées, pas supprimées.')) return;
   withBusy(e.target, 'Import…', async () => {
     try {
       await importFile('#settings-file', '/api/settings/import', async (r) => {
-        await loadSettings();
-        toast(`Configuration importée (${r.imported} paramètres) ✔`);
+        await Promise.all([loadSettings(), loadSubscribers(), loadLogs(), loadArchives()]);
+        toast(importSummary(r));
       });
     } catch (err) {
       toast('Erreur : ' + err.message, true);
@@ -236,21 +271,25 @@ async function loadArchives() {
       <td>${a.items_count}</td>
       <td>${a.recipients}</td>
       <td><a class="btn" href="/api/archives/${a.id}" target="_blank">Voir</a></td>
-    </tr>`).join('') || '<tr><td colspan="5">Aucune archive pour le moment.</td></tr>';
+    </tr>`).join('') || emptyRow(5, 'Aucune archive pour le moment.');
 }
 
 /* ---------------------------------------------------------------- logs -- */
 async function loadLogs() {
   const logs = await (await api('/api/logs')).json();
-  $('#logs-body').innerHTML = logs.map((l) => `
-    <tr>
-      <td>${escapeHtml((l.created_at || '').replace('T', ' '))}</td>
-      <td>${escapeHtml(l.trigger)}</td>
-      <td class="status-${escapeHtml(l.status)}">${escapeHtml(l.status)}</td>
-      <td>${l.items_count}</td>
-      <td>${l.recipients}</td>
-      <td>${escapeHtml(l.detail || '')}</td>
-    </tr>`).join('') || '<tr><td colspan="6">Aucun envoi pour le moment.</td></tr>';
+  $('#logs-body').innerHTML = logs.map((l) => {
+    const status = escapeHtml(l.status || 'unknown');
+    const klass = statusClass(l.status);
+    return `
+      <tr>
+        <td>${escapeHtml((l.created_at || '').replace('T', ' '))}</td>
+        <td>${escapeHtml(l.trigger)}</td>
+        <td><span class="status-pill is-${klass}">${status}</span></td>
+        <td>${l.items_count}</td>
+        <td>${l.recipients}</td>
+        <td>${escapeHtml(l.detail || '')}</td>
+      </tr>`;
+  }).join('') || emptyRow(6, 'Aucun envoi pour le moment.');
 }
 
 /* -------------------------------------------------------------- actions -- */
