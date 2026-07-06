@@ -13,6 +13,8 @@ import logging
 import mimetypes
 import smtplib
 import ssl
+import time
+from dataclasses import dataclass
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -21,6 +23,49 @@ log = logging.getLogger("jellynews.mailer")
 LOGO_CID = "logo@jellynews"  # référencé dans le template : src="cid:logo@jellynews"
 # Marqueur remplacé, PAR DESTINATAIRE, par son lien de désinscription signé.
 UNSUB_PLACEHOLDER = "%%UNSUB_URL%%"
+SMTP_BATCH_SIZE_MIN = 1
+SMTP_BATCH_SIZE_MAX = 500
+SMTP_BATCH_PAUSE_MIN = 0
+SMTP_BATCH_PAUSE_MAX = 3600
+
+
+@dataclass(frozen=True)
+class SendResult:
+    total: int
+    sent: int
+    failures: list[str]
+
+    @property
+    def failed(self) -> int:
+        return len(self.failures)
+
+    def __bool__(self) -> bool:
+        return self.sent > 0
+
+
+def _int_setting(settings: dict, key: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(str(settings.get(key, default)))
+    except (TypeError, ValueError):
+        raise ValueError(f"{key} doit être un entier")
+    if value < minimum or value > maximum:
+        raise ValueError(f"{key} doit être compris entre {minimum} et {maximum}")
+    return value
+
+
+def throttle_settings(settings: dict) -> tuple[int, int]:
+    return (
+        _int_setting(settings, "smtp_batch_size", 25, SMTP_BATCH_SIZE_MIN, SMTP_BATCH_SIZE_MAX),
+        _int_setting(settings, "smtp_batch_pause_seconds", 2, SMTP_BATCH_PAUSE_MIN, SMTP_BATCH_PAUSE_MAX),
+    )
+
+
+def _masked_recipient(email: str) -> str:
+    local, sep, domain = email.partition("@")
+    if not sep:
+        return "destinataire invalide"
+    head = local[:1] or "?"
+    return f"{head}***@{domain}"
 
 
 def _build_message(
@@ -83,16 +128,19 @@ def send_html(
     logo_path: Path | None = None,
     inline_images: dict[str, tuple[bytes, str]] | None = None,
     unsub_urls: dict[str, str] | None = None,
-) -> int:
-    """Envoie le HTML à chaque destinataire. Retourne le nombre d'envois réussis."""
+) -> SendResult:
+    """Envoie le HTML à chaque destinataire, avec To unique et throttling par vagues."""
     if not settings.get("smtp_host"):
         raise RuntimeError("Serveur SMTP non configuré")
     if not recipients:
-        return 0
+        return SendResult(total=0, sent=0, failures=[])
 
+    batch_size, pause_seconds = throttle_settings(settings)
     sent = 0
+    failures: list[str] = []
     with _connect(settings) as server:
-        for recipient in recipients:
+        total = len(recipients)
+        for index, recipient in enumerate(recipients, start=1):
             try:
                 msg = _build_message(
                     settings, recipient, subject, html, logo_path,
@@ -100,6 +148,10 @@ def send_html(
                 )
                 server.send_message(msg)
                 sent += 1
-            except smtplib.SMTPException:
-                log.exception("Échec d'envoi à %s", recipient)
-    return sent
+            except (smtplib.SMTPException, OSError) as exc:
+                log.exception("Échec d'envoi à %s", _masked_recipient(recipient))
+                failures.append(f"{_masked_recipient(recipient)}: {type(exc).__name__}")
+            if index < total and index % batch_size == 0 and pause_seconds:
+                log.info("Pause SMTP %ss après %s/%s destinataires", pause_seconds, index, total)
+                time.sleep(pause_seconds)
+    return SendResult(total=len(recipients), sent=sent, failures=failures)

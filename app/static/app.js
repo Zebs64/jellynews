@@ -333,7 +333,11 @@ $('#btn-send-now').addEventListener('click', (e) => {
   withBusy(e.target, 'Envoi en cours…', async () => {
     try {
       const result = await (await api('/api/send-now', { method: 'POST' })).json();
-      toast(`Terminé : ${result.sent} email(s) envoyés, ${result.items} médias (${result.status})`);
+      if (result.queued) {
+        toast('Campagne lancée en arrière-plan ✔');
+      } else {
+        toast(`Terminé : ${result.sent} email(s) envoyés, ${result.items} médias (${result.status})`);
+      }
       await Promise.all([loadLogs(), loadArchives()]);
     } catch (err) {
       toast('Erreur : ' + err.message, true);

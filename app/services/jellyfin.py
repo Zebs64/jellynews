@@ -6,12 +6,14 @@ import re
 
 import httpx
 
+from ..version import APP_VERSION
+
 log = logging.getLogger("jellynews.jellyfin")
 
 JELLYFIN_CLIENT = "JellyNews"
 JELLYFIN_DEVICE = "JellyNews"
 JELLYFIN_DEVICE_ID = "jellynews"
-JELLYFIN_CLIENT_VERSION = "1.0.2"
+JELLYFIN_CLIENT_VERSION = APP_VERSION
 
 
 def _jellyfin_headers(settings: dict) -> dict[str, str]:

@@ -35,6 +35,8 @@ DEFAULTS = {
     "smtp_user": "",
     "smtp_password": "",
     "smtp_sender": "",
+    "smtp_batch_size": "25",
+    "smtp_batch_pause_seconds": "2",
     "llm_api_url": "https://openrouter.ai/api/v1",
     "llm_api_key": "",
     "llm_model": "openai/gpt-4o-mini",
@@ -135,7 +137,7 @@ def _rows(conn: sqlite3.Connection, query: str) -> list[dict]:
 
 
 def export_backup(app_version: str) -> dict:
-    """Sauvegarde complète v1.0.2 : config + abonnés + historique.
+    """Sauvegarde complète : config + abonnés + historique.
 
     Périmètre volontairement strict : pas d'utilisateurs, pas de secret.key,
     pas de fichiers uploadés. Les settings contiennent des secrets applicatifs,

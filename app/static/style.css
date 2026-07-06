@@ -53,7 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: url('/static/brand/media-current-bg.svg') top right / 760px auto no-repeat;
+  background: url('/static/brand/media-current-bg.svg?v=1.0.3') top right / 760px auto no-repeat;
   opacity: .16;
 }
 
@@ -301,7 +301,7 @@ blockquote {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  background: url('/static/brand/empty-media-mail.svg') center / contain no-repeat;
+  background: url('/static/brand/empty-media-mail.svg?v=1.0.3') center / contain no-repeat;
   opacity: .82;
 }
 .empty-state.compact { padding: 8px 0; }

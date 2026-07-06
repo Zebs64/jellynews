@@ -8,11 +8,12 @@ import json
 import re
 import zoneinfo
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 
 from .. import auth, database, scheduler
 from ..services import jellyfin, llm, mailer, newsletter
+from ..version import APP_VERSION
 
 router = APIRouter(prefix="/api", dependencies=[Depends(auth.require_user)])
 
@@ -21,11 +22,23 @@ ALLOWED_LOGO_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 Mo
 
 
+def _validate_int_range(payload: dict, key: str, minimum: int, maximum: int) -> None:
+    if key not in payload:
+        return
+    try:
+        value = int(str(payload[key]))
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"Champ numérique invalide : {key}")
+    if value < minimum or value > maximum:
+        raise HTTPException(400, f"{key} doit être compris entre {minimum} et {maximum}")
+
+
 # --------------------------------------------------------------- settings --
 @router.get("/settings")
 def get_settings():
     settings = database.get_settings()
     settings["_next_run"] = scheduler.next_run_iso()
+    settings["_app_version"] = APP_VERSION
     return settings
 
 
@@ -44,6 +57,8 @@ def _validate_settings(payload: dict) -> None:
                 ipaddress.ip_network(entry, strict=False)
             except ValueError:
                 raise HTTPException(400, f"IP ou CIDR invalide : {entry}")
+    _validate_int_range(payload, "smtp_batch_size", 1, 500)
+    _validate_int_range(payload, "smtp_batch_pause_seconds", 0, 3600)
 
 
 def _parse_iso_datetime(value: object, field: str) -> str:
@@ -257,7 +272,7 @@ def export_settings():
     return Response(
         json.dumps(database.export_backup(jellyfin.JELLYFIN_CLIENT_VERSION), indent=2, ensure_ascii=False),
         media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=jellynews-backup-v1.0.2-secrets.json"},
+        headers={"Content-Disposition": f"attachment; filename=jellynews-backup-v{APP_VERSION}-secrets.json"},
     )
 
 
@@ -333,10 +348,10 @@ def test_email(payload: dict = Body(...)):
         "<p>Si vous lisez ceci, votre configuration SMTP fonctionne.</p></div>"
     )
     try:
-        sent = mailer.send_html(settings, [to], "JellyNews — Email de test", html)
+        result = mailer.send_html(settings, [to], "JellyNews — Email de test", html)
     except Exception as exc:
         raise HTTPException(502, f"Échec SMTP : {exc}")
-    if not sent:
+    if not result:
         raise HTTPException(502, "Le serveur SMTP a refusé le message")
     return {"ok": True}
 
@@ -358,8 +373,8 @@ def preview():
 
 
 @router.post("/send-now")
-def send_now():
-    try:
-        return newsletter.run(trigger="manual")
-    except Exception as exc:
-        raise HTTPException(502, f"Échec de l'envoi : {exc}")
+def send_now(background_tasks: BackgroundTasks):
+    if not newsletter.claim_campaign():
+        raise HTTPException(409, "Une campagne newsletter est déjà en cours")
+    background_tasks.add_task(newsletter.run_claimed, trigger="manual")
+    return {"status": "queued", "queued": True}
