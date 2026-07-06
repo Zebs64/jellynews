@@ -20,11 +20,11 @@
       bloqué comme une image distante.
   -->
 </head>
-<body style="margin:0; padding:0; background-color:#0b0f14; -webkit-text-size-adjust:100%;">
+<body style="margin:0; padding:0; background-color:#07111f; -webkit-text-size-adjust:100%;">
   <!-- Préheader invisible (texte affiché à côté du sujet dans la boîte de réception) -->
   <div style="display:none; max-height:0px; overflow:hidden; mso-hide:all;">{{ preheader }}</div>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0b0f14;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#07111f;">
     <tr>
       <td align="center" style="padding:32px 12px;">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:100%;">
@@ -50,7 +50,7 @@
           <tr>
             <td style="padding:0 0 28px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                     style="background-color:#151c24; border-radius:16px; border:1px solid #1f2933;">
+                     style="background-color:#162336; border-radius:16px; border:1px solid #20344a;">
                 <tr>
                   <td style="padding:22px 26px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:15px; line-height:1.65; color:#cfd9e2; font-style:italic;">
                     {{ intro }}
@@ -65,7 +65,7 @@
           {% for section in sections %}
           <tr>
             <td style="padding:6px 4px 14px 4px;">
-              <h2 style="margin:0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:18px; font-weight:700; color:#5aa9ff; letter-spacing:0.4px;">
+              <h2 style="margin:0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:18px; font-weight:700; color:#00a4dc; letter-spacing:0.4px;">
                 {{ section.label }}
               </h2>
             </td>
@@ -74,19 +74,19 @@
           <tr>
             <td style="padding:0 0 16px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                     style="background-color:#11161d; border-radius:14px; border:1px solid #1c252e;">
+                     style="background-color:#101c2d; border-radius:14px; border:1px solid #20344a;">
                 <tr>
                   <td width="110" valign="top" style="padding:14px 0 14px 14px;">
                     {% if item.poster_src %}
                     <a href="{{ item.url }}" style="text-decoration:none;">
                       <img src="{{ item.poster_src }}" alt="{{ item.name }}" width="110"
-                           style="display:block; width:110px; height:auto; border-radius:10px; border:0; background-color:#1c252e;">
+                           style="display:block; width:110px; height:auto; border-radius:10px; border:0; background-color:#20344a;">
                     </a>
                     {% else %}
                     <table role="presentation" width="110" cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td height="160" align="center" valign="middle"
-                            style="background-color:#1c252e; border-radius:10px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:11px; color:#5d6b78;">
+                            style="background-color:#20344a; border-radius:10px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:11px; color:#5d6b78;">
                           Pas d'affiche
                         </td>
                       </tr>
@@ -99,7 +99,7 @@
                       <span style="font-weight:400; color:#8b98a5;">({{ item.year }})</span>{% endif %}
                     </p>
                     {% if item.badge %}
-                    <p style="margin:0 0 7px 0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; font-weight:600; color:#5aa9ff;">
+                    <p style="margin:0 0 7px 0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; font-weight:600; color:#00a4dc;">
                       {{ item.badge }}
                     </p>
                     {% endif %}
@@ -116,11 +116,11 @@
 
           <!-- ===== Pied de page ===== -->
           <tr>
-            <td align="center" style="padding:26px 0 0 0; border-top:1px solid #1c252e;">
+            <td align="center" style="padding:26px 0 0 0; border-top:1px solid #20344a;">
               <p style="margin:0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.7; color:#5d6b78;">
                 Newsletter générée automatiquement par JellyNews · {{ now_year }}<br>
                 {% if unsubscribe_url %}
-                <a href="{{ unsubscribe_url }}" style="color:#5aa9ff; text-decoration:underline;">Se désinscrire en un clic</a>
+                <a href="{{ unsubscribe_url }}" style="color:#00a4dc; text-decoration:underline;">Se désinscrire en un clic</a>
                 {% else %}
                 Pour vous désinscrire, répondez simplement à cet e-mail.
                 {% endif %}

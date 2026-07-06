@@ -1,0 +1,38 @@
+{
+  "input": "app/static/brand/jellynews-mark.svg",
+  "argv": [
+    "app/static/brand/jellynews-mark.svg",
+    "--out",
+    "docs/design/jellynews-mark-kit",
+    "--pack"
+  ],
+  "sizes": [
+    16,
+    32,
+    48,
+    128,
+    256
+  ],
+  "render_ok": true,
+  "pack": [
+    "jellynews-mark.svg",
+    "favicon-16.png",
+    "favicon-32.png",
+    "favicon-48.png",
+    "apple-touch-icon.png",
+    "icon-192.png",
+    "icon-512.png",
+    "favicon.ico",
+    "snippet-head.html",
+    "snippet-manifest.json"
+  ],
+  "checks": [
+    {
+      "check": "svg-valide",
+      "level": "error",
+      "pass": true,
+      "detail": "viewBox présent, XML valide, rendu OK"
+    }
+  ],
+  "pass": true
+}

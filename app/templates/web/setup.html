@@ -8,7 +8,13 @@
 </head>
 <body class="auth-page">
   <div class="auth-card">
-    <h1>🪼 JellyNews</h1>
+    <div class="brand-lockup">
+      <img class="brand-mark" src="/static/brand/jellynews-mark.svg" alt="" aria-hidden="true">
+      <div class="brand-text">
+        <span class="brand-name">JellyNews</span>
+        <span class="brand-subtitle">Media digest</span>
+      </div>
+    </div>
     <p class="subtitle">Première configuration : créez le compte administrateur.</p>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="post" action="/setup">

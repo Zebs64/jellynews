@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JellyNews v1.0.2 — Media Current preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --jn-bg-deep: #07111f;
+      --jn-bg: #0b1626;
+      --jn-surface: #101c2d;
+      --jn-surface-raised: #162336;
+      --jn-border: #20344a;
+      --jn-border-hot: #2f80b7;
+      --jn-text: #f2f7fb;
+      --jn-muted: #9fb0c3;
+      --jn-cyan: #00f5d4;
+      --jn-blue: #00a4dc;
+      --jn-violet: #7c4dff;
+      --jn-gold: #ffe66d;
+      --jn-danger: #ff6b7a;
+      --jn-ok: #4ee59d;
+      --jn-gradient-primary: linear-gradient(135deg, #7c4dff 0%, #00a4dc 58%, #00f5d4 100%);
+      --jn-shadow-soft: 0 18px 60px rgba(0, 8, 22, .34);
+      --jn-focus: 0 0 0 3px rgba(0, 245, 212, .22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 78% 12%, rgba(0, 245, 212, .12), transparent 32rem),
+        radial-gradient(circle at 15% 0%, rgba(124, 77, 255, .22), transparent 34rem),
+        var(--jn-bg-deep);
+      color: var(--jn-text);
+      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 248px;
+      padding: 22px 18px;
+      background: rgba(16, 28, 45, .82);
+      border-right: 1px solid var(--jn-border);
+      box-shadow: var(--jn-shadow-soft);
+      backdrop-filter: blur(18px);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .brand-lockup { display: flex; align-items: center; gap: 12px; }
+    .brand-lockup img { width: 42px; height: 42px; }
+    .brand-lockup strong { display: block; font-size: 22px; letter-spacing: -0.04em; }
+    .brand-lockup span { display: block; color: var(--jn-muted); font-size: 12px; margin-top: -3px; }
+    nav { display: grid; gap: 5px; }
+    nav { scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    .nav-btn {
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--jn-muted);
+      padding: 10px 12px;
+      text-align: left;
+      font: inherit;
+    }
+    .nav-btn.active {
+      background: var(--jn-gradient-primary);
+      color: #06111f;
+      font-weight: 750;
+      box-shadow: 0 10px 26px rgba(0, 164, 220, .22);
+    }
+    .nav-btn:not(.active):hover { border-color: var(--jn-border-hot); color: var(--jn-text); background: rgba(22, 35, 54, .72); }
+    .sidebar-footer { margin-top: auto; color: var(--jn-muted); font-size: 13px; }
+    main { flex: 1; padding: 34px clamp(20px, 5vw, 56px); max-width: 1120px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(47, 128, 183, .55);
+      border-radius: 26px;
+      padding: 26px;
+      background: linear-gradient(145deg, rgba(16, 28, 45, .96), rgba(11, 22, 38, .88));
+      box-shadow: var(--jn-shadow-soft);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: url("../../app/static/brand/media-current-bg.svg") center/cover no-repeat;
+      opacity: .42;
+      pointer-events: none;
+    }
+    .hero > * { position: relative; z-index: 1; }
+    .kicker { color: var(--jn-cyan); text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 800; }
+    h1, h2, h3 { letter-spacing: -.035em; line-height: 1.1; }
+    h1 { margin: 8px 0 10px; font-size: clamp(32px, 5vw, 54px); max-width: 760px; }
+    .lead { color: var(--jn-muted); max-width: 700px; font-size: 17px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 22px 0 0; }
+    .metric-card, .panel, .table-shell {
+      border: 1px solid var(--jn-border);
+      background: rgba(16, 28, 45, .88);
+      border-radius: 20px;
+      box-shadow: 0 12px 36px rgba(0, 8, 22, .18);
+    }
+    .metric-card { padding: 16px; }
+    .metric-card span { color: var(--jn-muted); font-size: 13px; }
+    .metric-card strong { display: block; margin-top: 5px; font-size: 24px; font-variant-numeric: tabular-nums; }
+    .panel { margin-top: 18px; padding: 24px; }
+    .panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
+    .panel-heading h2 { margin: 0 0 6px; font-size: 28px; }
+    .panel-heading p { margin: 0; color: var(--jn-muted); }
+    .status-pill { border: 1px solid rgba(78, 229, 157, .44); color: var(--jn-ok); background: rgba(78, 229, 157, .1); border-radius: 999px; padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { display: block; color: var(--jn-text); font-weight: 650; }
+    small { display: block; margin-top: 5px; color: var(--jn-muted); font-weight: 400; }
+    input, select, textarea {
+      width: 100%; min-height: 44px; margin-top: 7px; padding: 10px 12px;
+      border: 1px solid var(--jn-border); border-radius: 13px;
+      background: var(--jn-surface-raised); color: var(--jn-text); font: inherit;
+    }
+    input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: none; box-shadow: var(--jn-focus); border-color: var(--jn-cyan); }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .btn {
+      border: 1px solid var(--jn-border); border-radius: 13px; min-height: 42px; padding: 10px 16px;
+      background: var(--jn-surface-raised); color: var(--jn-text); font: inherit; text-decoration: none;
+    }
+    .btn.primary { background: var(--jn-gradient-primary); color: #06111f; border-color: transparent; font-weight: 800; }
+    .btn:hover { border-color: var(--jn-border-hot); }
+    .table-shell { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td { padding: 13px 16px; border-bottom: 1px solid var(--jn-border); text-align: left; font-variant-numeric: tabular-nums; }
+    th { color: var(--jn-muted); font-size: 13px; }
+    .ok { color: var(--jn-ok); font-weight: 800; }
+    .empty-state { display: flex; align-items: center; gap: 18px; color: var(--jn-muted); }
+    .empty-state img { width: 132px; flex: 0 0 auto; }
+    @media (max-width: 780px) {
+      .layout { display: block; }
+      .sidebar { width: auto; position: static; }
+      nav { display: flex; overflow-x: auto; padding-bottom: 4px; }
+      .nav-btn { white-space: nowrap; }
+      .metrics, .field-grid { grid-template-columns: 1fr; }
+      .panel-heading { display: block; }
+      main { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <img src="../../app/static/brand/jellynews-mark.svg" alt="">
+        <div><strong>JellyNews</strong><span>media digest station</span></div>
+      </div>
+      <nav aria-label="Navigation prototype">
+        <button class="nav-btn active">Jellyfin</button>
+        <button class="nav-btn">SMTP</button>
+        <button class="nav-btn">IA / LLM</button>
+        <button class="nav-btn">Planification</button>
+        <button class="nav-btn">Abonnés</button>
+        <button class="nav-btn">Envoi & logs</button>
+      </nav>
+      <div class="sidebar-footer">Connecté : admin<br>v1.0.2 direction Aï</div>
+    </aside>
+    <main>
+      <section class="hero">
+        <div class="kicker">Jellyfin → Newsletter</div>
+        <h1>Le courant hebdomadaire de votre médiathèque.</h1>
+        <p class="lead">Une interface admin sombre, lisible et plus identifiable : médias, abonnés et envois avancent dans le même flux.</p>
+        <div class="metrics">
+          <div class="metric-card"><span>Prochain envoi</span><strong>Ven. 18:00</strong></div>
+          <div class="metric-card"><span>Nouveautés trouvées</span><strong>5 médias</strong></div>
+          <div class="metric-card"><span>Abonnés actifs</span><strong>42</strong></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Serveur Jellyfin</h2>
+            <p>Connectez la médiathèque et choisissez ce qui entre dans le courant hebdomadaire.</p>
+          </div>
+          <span class="status-pill">Connexion OK</span>
+        </div>
+        <div class="field-grid">
+          <label>URL du serveur
+            <input value="http://jellyfin:8096">
+            <small>Adresse interne du serveur Jellyfin.</small>
+          </label>
+          <label>URL publique
+            <input value="https://jellyfin.domain.com/">
+            <small>Uniquement nécessaire pour le mode liens.</small>
+          </label>
+        </div>
+        <label style="margin-top:14px">Bibliothèques incluses
+          <select><option>Films, Séries, Musique</option></select>
+        </label>
+        <div class="row">
+          <button class="btn primary">Enregistrer</button>
+          <button class="btn">Tester la connexion</button>
+          <button class="btn">Charger les bibliothèques</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Envoi & historique</h2>
+            <p>Les statuts deviennent des badges et les tables gardent leur lisibilité en mobile.</p>
+          </div>
+        </div>
+        <div class="table-shell">
+          <table>
+            <thead><tr><th>Date</th><th>Déclencheur</th><th>Statut</th><th>Médias</th><th>Envoyés</th><th>Détail</th></tr></thead>
+            <tbody>
+              <tr><td>2026-06-12 18:26</td><td>manual</td><td><span class="ok">ok</span></td><td>5</td><td>5</td><td>5/5 emails envoyés.</td></tr>
+              <tr><td>2026-06-12 08:30</td><td>manual</td><td><span class="ok">ok</span></td><td>5</td><td>4</td><td>4/4 emails envoyés.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel empty-state">
+        <img src="../../app/static/brand/empty-media-mail.svg" alt="">
+        <div><h3>État vide prêt</h3><p>À utiliser quand aucune archive, aucun log ou aucun abonné n’est encore disponible.</p></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

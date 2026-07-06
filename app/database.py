@@ -129,6 +129,127 @@ def set_settings(values: dict) -> None:
         )
 
 
+# --------------------------------------------------------------- backups --
+def _rows(conn: sqlite3.Connection, query: str) -> list[dict]:
+    return [dict(r) for r in conn.execute(query).fetchall()]
+
+
+def export_backup(app_version: str) -> dict:
+    """Sauvegarde complète v1.0.2 : config + abonnés + historique.
+
+    Périmètre volontairement strict : pas d'utilisateurs, pas de secret.key,
+    pas de fichiers uploadés. Les settings contiennent des secrets applicatifs,
+    l'UI/API doivent donc continuer à avertir l'administrateur.
+    """
+    with get_conn() as conn:
+        settings = dict(DEFAULTS)
+        settings.update({r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")})
+        return {
+            "schema_version": 2,
+            "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "app_version": app_version,
+            "settings": settings,
+            "subscribers": _rows(
+                conn,
+                "SELECT email, created_at FROM subscribers ORDER BY email",
+            ),
+            "send_logs": _rows(
+                conn,
+                "SELECT created_at, trigger, status, items_count, recipients, detail "
+                "FROM send_logs ORDER BY id",
+            ),
+            "archives": _rows(
+                conn,
+                "SELECT created_at, subject, items_count, recipients, html "
+                "FROM archives ORDER BY id",
+            ),
+        }
+
+
+def _exists(conn: sqlite3.Connection, table: str, values: dict) -> bool:
+    columns = list(values)
+    where = " AND ".join(f"{col} = ?" for col in columns)
+    row = conn.execute(
+        f"SELECT 1 FROM {table} WHERE {where} LIMIT 1",
+        [values[col] for col in columns],
+    ).fetchone()
+    return row is not None
+
+
+def import_backup_data(data: dict) -> dict:
+    """Import fusionnel et idempotent d'une sauvegarde pré-validée.
+
+    Les logs et archives n'ont pas de contrainte UNIQUE en base. On déduplique
+    donc sur une clé métier déterministe : l'ensemble des colonnes exportées.
+    """
+    settings = {k: str(v) for k, v in data.get("settings", {}).items() if k in DEFAULTS}
+    subscribers = data.get("subscribers", [])
+    send_logs = data.get("send_logs", [])
+    archives = data.get("archives", [])
+    imported = {"settings": len(settings), "subscribers": 0, "send_logs": 0, "archives": 0}
+    skipped = {"settings": 0, "subscribers": 0, "send_logs": 0, "archives": 0}
+
+    with get_conn() as conn:
+        conn.executemany(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            list(settings.items()),
+        )
+
+        for sub in subscribers:
+            row = conn.execute("SELECT 1 FROM subscribers WHERE email = ?", (sub["email"],)).fetchone()
+            if row:
+                skipped["subscribers"] += 1
+                continue
+            conn.execute(
+                "INSERT INTO subscribers (email, created_at) VALUES (?, ?)",
+                (sub["email"], sub["created_at"]),
+            )
+            imported["subscribers"] += 1
+
+        for log in send_logs:
+            key = {
+                "created_at": log["created_at"],
+                "trigger": log["trigger"],
+                "status": log["status"],
+                "items_count": log["items_count"],
+                "recipients": log["recipients"],
+                "detail": log["detail"],
+            }
+            if _exists(conn, "send_logs", key):
+                skipped["send_logs"] += 1
+                continue
+            conn.execute(
+                "INSERT INTO send_logs (created_at, trigger, status, items_count, recipients, detail) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (log["created_at"], log["trigger"], log["status"], log["items_count"], log["recipients"], log["detail"]),
+            )
+            imported["send_logs"] += 1
+
+        for archive in archives:
+            base_key = {
+                "created_at": archive["created_at"],
+                "subject": archive["subject"],
+                "items_count": archive["items_count"],
+                "recipients": archive["recipients"],
+            }
+            html_candidates = dict.fromkeys([
+                archive["html"],
+                archive.get("_source_html", archive["html"]),
+            ])
+            if any(_exists(conn, "archives", {**base_key, "html": html_value}) for html_value in html_candidates):
+                skipped["archives"] += 1
+                continue
+            conn.execute(
+                "INSERT INTO archives (created_at, subject, items_count, recipients, html) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (archive["created_at"], archive["subject"], archive["items_count"], archive["recipients"], archive["html"]),
+            )
+            imported["archives"] += 1
+
+    return {"imported": imported, "skipped": skipped}
+
+
 # ------------------------------------------------------------------- users --
 def has_admin() -> bool:
     with get_conn() as conn:

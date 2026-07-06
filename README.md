@@ -28,9 +28,36 @@ avec en option un résumé sur Discord.
 - **Archives** : chaque newsletter envoyée est consultable depuis l'admin.
 - **Test LLM** dans l'interface (affiche l'erreur réelle de l'API).
 - **Anti-brute-force** sur le login (5 essais / 15 min par IP).
-- **Import/export** : abonnés en CSV, configuration en JSON.
+- **Sauvegarde complète JSON** : configuration, abonnés, historique d'envoi et archives ; import fusionnel compatible avec les anciens exports de configuration v1.0.1.
+- **Import/export abonnés CSV** : conservé pour les opérations rapides sur la liste d'abonnés.
 - **Reverse-proxy** : configurable dans l'interface (IPs de confiance, cookie Secure).
 - **Discord** : résumé optionnel par webhook.
+
+## Sauvegarde et restauration
+
+Depuis la version **v1.0.2**, le panneau d'administration expose une sauvegarde
+JSON complète via `/api/settings/export`. Elle contient :
+
+- la configuration applicative ;
+- les abonnés ;
+- les logs d'envoi ;
+- les archives HTML des newsletters.
+
+Le fichier est nommé `jellynews-backup-v1.0.2-secrets.json` car il contient les
+secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
+Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
+
+L'import `/api/settings/import` restaure les données par fusion : il ajoute les
+abonnés, logs et archives manquants, ignore les doublons détectés et met à jour
+les paramètres connus. Les anciens exports v1.0.1 limités aux paramètres restent
+compatibles ; dans ce cas, seuls les réglages reconnus sont restaurés.
+
+Limites importantes : l'export n'inclut pas les comptes administrateurs,
+`secret.key`, la base SQLite brute ni les fichiers uploadés comme le logo. Pour
+un rollback complet, conservez toujours une copie du volume `data/` avant mise à
+jour.
+
+Voir aussi : [`docs/releases/v1.0.2.md`](docs/releases/v1.0.2.md).
 
 ## Démarrage
 
