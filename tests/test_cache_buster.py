@@ -14,15 +14,38 @@ class CacheBusterTests(unittest.TestCase):
         self.assertEqual(ASSET_VERSION, APP_VERSION)
 
     def test_web_templates_version_mutable_assets(self):
+        expected_favicon_links = [
+            '/static/brand/jellynews-mark.svg?v={{ asset_version }}',
+            '/static/brand/favicon-32.png?v={{ asset_version }}',
+            '/static/brand/favicon.ico?v={{ asset_version }}',
+            '/static/brand/apple-touch-icon.png?v={{ asset_version }}',
+            '/static/brand/site.webmanifest?v={{ asset_version }}',
+        ]
         for name in ["dashboard.html", "login.html", "setup.html", "unsubscribe.html"]:
             with self.subTest(template=name):
                 source = (WEB_TEMPLATES / name).read_text(encoding="utf-8")
                 self.assertIn('/static/style.css?v={{ asset_version }}', source)
+                for link in expected_favicon_links:
+                    self.assertIn(link, source)
 
         dashboard = (WEB_TEMPLATES / "dashboard.html").read_text(encoding="utf-8")
         self.assertIn('/static/app.js?v={{ asset_version }}', dashboard)
         self.assertIn('/static/brand/jellynews-mark.svg?v={{ asset_version }}', dashboard)
         self.assertIn("JellyNews v{{ app_version }}", dashboard)
+
+    def test_favicon_assets_are_shipped_with_app_static_files(self):
+        for name in [
+            "favicon-16.png",
+            "favicon-32.png",
+            "favicon-48.png",
+            "favicon.ico",
+            "apple-touch-icon.png",
+            "icon-192.png",
+            "icon-512.png",
+            "site.webmanifest",
+        ]:
+            with self.subTest(asset=name):
+                self.assertTrue((ROOT / "app" / "static" / "brand" / name).is_file())
 
     def test_css_versions_static_svg_backgrounds(self):
         source = (ROOT / "app" / "static" / "style.css").read_text(encoding="utf-8")
