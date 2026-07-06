@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JellyNews — Administration</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar">
     <div class="brand-lockup">
-      <img class="brand-mark" src="/static/brand/jellynews-mark.svg" alt="" aria-hidden="true">
+      <img class="brand-mark" src="/static/brand/jellynews-mark.svg?v={{ asset_version }}" alt="" aria-hidden="true">
       <div class="brand-text">
         <span class="brand-name">JellyNews</span>
         <span class="brand-subtitle">Media digest</span>
@@ -30,6 +30,7 @@
     </nav>
     <div class="sidebar-footer">
       <span>Connecté : {{ user }}</span>
+      <span>JellyNews v{{ app_version }}</span>
       <a href="/logout">Déconnexion</a>
     </div>
   </aside>
@@ -80,7 +81,7 @@
     <!-- ================================ SMTP ============================== -->
     <section id="panel-smtp" class="panel hidden">
       <h2>Serveur SMTP</h2>
-      <form class="settings-form" data-keys="smtp_host,smtp_port,smtp_security,smtp_user,smtp_password,smtp_sender">
+      <form class="settings-form" data-keys="smtp_host,smtp_port,smtp_security,smtp_user,smtp_password,smtp_sender,smtp_batch_size,smtp_batch_pause_seconds">
         <div class="grid-2">
           <label>Hôte
             <input type="text" name="smtp_host" placeholder="smtp.exemple.fr">
@@ -107,6 +108,16 @@
         <label>Expéditeur (From)
           <input type="email" name="smtp_sender" placeholder="newsletter@mondomaine.fr">
         </label>
+        <div class="grid-2">
+          <label>Taille de vague SMTP
+            <input type="number" name="smtp_batch_size" min="1" max="500">
+            <small>Nombre de messages individuels envoyés avant pause.</small>
+          </label>
+          <label>Pause entre vagues (secondes)
+            <input type="number" name="smtp_batch_pause_seconds" min="0" max="3600">
+            <small>Réduit les signaux anti-spam côté fournisseur SMTP.</small>
+          </label>
+        </div>
         <div class="row">
           <button type="submit" class="btn primary">Enregistrer</button>
           <input type="email" id="test-email-to" placeholder="adresse@test.fr" class="inline-input">
@@ -292,7 +303,7 @@
     <section id="panel-backup" class="panel hidden">
       <div class="panel-heading">
         <h2>Sauvegarde complète</h2>
-        <p>Export v1.0.2 : configuration, abonnés, historique des envois et archives de newsletters.</p>
+        <p>Export v{{ app_version }} : configuration, abonnés, historique des envois et archives de newsletters.</p>
       </div>
       <p class="info">⚠️ Le fichier exporté contient vos secrets (mot de passe SMTP, clés API Jellyfin/LLM) : stockez-le en lieu sûr.</p>
       <div class="row">
@@ -306,6 +317,6 @@
     </section>
   </main>
 </div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

@@ -73,7 +73,7 @@ class BackupImportExportTests(unittest.TestCase):
         self.assertNotIn("users", backup)
         self.assertNotIn("password_hash", dump)
         self.assertNotIn("secret.key", dump)
-        self.assertIn("jellynews-backup-v1.0.2-secrets.json", response.headers["content-disposition"])
+        self.assertIn("jellynews-backup-v1.0.3-secrets.json", response.headers["content-disposition"])
 
     def test_import_legacy_settings_only_export_still_works(self):
         result = self.import_payload({

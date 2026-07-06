@@ -23,6 +23,10 @@ avec en option un résumé sur Discord.
   Jellyfin sur Internet ; ou mode « lien » pour des emails plus légers.
 - **Désinscription en un clic** : lien signé par abonné + header
   `List-Unsubscribe` RFC 8058 (bouton natif Gmail/Outlook).
+- **Envois SMTP propres** : un email individuel par abonné, sans `Cc/Bcc`,
+  avec throttling par vagues configurables pour limiter les signaux anti-spam.
+- **Cache-buster applicatif** : les assets statiques modifiables portent la
+  version applicative (`?v=1.0.3`) pour éviter le hard refresh après release.
 - **Filtrage par bibliothèque** : cochez les bibliothèques Jellyfin à inclure.
 - **Titres et affiches cliquables** : deep links vers la fiche Jellyfin.
 - **Archives** : chaque newsletter envoyée est consultable depuis l'admin.
@@ -43,7 +47,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.0.2-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.0.3-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -57,7 +61,7 @@ Limites importantes : l'export n'inclut pas les comptes administrateurs,
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.0.2.md`](docs/releases/v1.0.2.md).
+Voir aussi : [`docs/releases/v1.0.3.md`](docs/releases/v1.0.3.md).
 
 ## Démarrage
 
@@ -99,8 +103,11 @@ Puis ouvrez **http://localhost:8050** :
 2. **Jellyfin** : URL interne (ex. `http://jellyfin:8096`), clé API
    (Tableau de bord Jellyfin → Clés API). L'URL publique n'est nécessaire
    qu'en mode « lien » — le mode « incorporé » (par défaut) n'en a pas besoin.
-3. **SMTP** : hôte, port, sécurité (STARTTLS/SSL), identifiants, expéditeur.
-   Testez avec le bouton « Email de test ».
+3. **SMTP** : hôte, port, sécurité (STARTTLS/SSL), identifiants, expéditeur,
+   taille de vague et pause entre vagues. Testez avec le bouton « Email de test ».
+   Configurez aussi SPF, DKIM et DMARC sur votre domaine d'envoi : JellyNews
+   envoie proprement, mais la réputation reste celle de votre domaine SMTP.
+   Ajustez les vagues selon les limites horaires et journalières de votre relais.
 4. **IA / LLM** : clé API OpenRouter ou OpenAI + prompt humoristique.
    En cas d'échec du LLM, un texte de repli est utilisé (l'envoi n'est jamais bloqué).
 5. **Planification** : jour + heure + fuseau horaire de l'envoi hebdomadaire.
@@ -153,5 +160,15 @@ jellynews/
   supportent ni flexbox ni les feuilles de style externes). Logo en `cid:`
   et affiches en pièces jointes inline (Content-ID) — pas de dépendance à
   une URL publique, affichage garanti partout.
+- **Délivrabilité SMTP** : JellyNews envoie un message distinct par abonné,
+  sans `Cc/Bcc`, avec version texte et headers `List-Unsubscribe` quand
+  `app_public_url` est configurée. Ce comportement améliore la propreté de
+  l'envoi, mais ne remplace pas SPF, DKIM, DMARC ni une réputation SMTP saine.
+- **Throttling** : `smtp_batch_size` et `smtp_batch_pause_seconds` limitent
+  la cadence d'envoi par vagues. Ils doivent être adaptés aux quotas du
+  fournisseur SMTP ; JellyNews ne contourne pas ces limites.
+- **Cache-buster** : la version applicative alimente `?v=...` sur les assets
+  web modifiables. Après rollback, purgez aussi le cache d'un éventuel proxy
+  frontal s'il force sa propre politique de cache.
 - **Personnalisation du template** : décommentez le montage du dossier
   `templates/email` dans `docker-compose.yml` pour l'éditer sans rebuild.

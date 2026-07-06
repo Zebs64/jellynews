@@ -1,6 +1,7 @@
 """Orchestrateur : Jellyfin -> LLM -> rendu HTML -> SMTP -> Discord -> archive/log."""
 import datetime
 import logging
+import threading
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -9,6 +10,13 @@ from .. import auth, database
 from . import discord, jellyfin, llm, mailer
 
 log = logging.getLogger("jellynews.newsletter")
+
+
+class CampaignAlreadyRunning(RuntimeError):
+    """Une campagne newsletter est déjà active dans ce processus."""
+
+
+_campaign_lock = threading.Lock()
 
 EMAIL_TEMPLATES = Path(__file__).resolve().parent.parent / "templates" / "email"
 _env = Environment(
@@ -25,6 +33,20 @@ SECTION_ORDER = [
 # Garde-fou sur le poids de l'email : au-delà, les affiches restantes
 # retombent en simples liens (un email > ~5 Mo finit souvent en spam).
 MAX_EMBEDDED_POSTERS = 50
+
+
+def claim_campaign() -> bool:
+    return _campaign_lock.acquire(blocking=False)
+
+
+def run_claimed(trigger: str = "manual") -> dict | None:
+    try:
+        return run(trigger=trigger, _lock_already_acquired=True)
+    except Exception:
+        log.exception("Campagne newsletter %s échouée", trigger)
+        return None
+    finally:
+        _campaign_lock.release()
 
 
 def _logo_path(settings: dict) -> Path | None:
@@ -116,8 +138,20 @@ def render_html(settings: dict, context: dict, for_email: bool = True,
     return template.render(**context, logo_src=logo_src, unsubscribe_url=unsubscribe_url)
 
 
-def run(trigger: str = "manual") -> dict:
+def run(trigger: str = "manual", *, _lock_already_acquired: bool = False) -> dict:
     """Pipeline complet d'envoi. Toujours journalisé dans send_logs."""
+    if not _lock_already_acquired and not claim_campaign():
+        database.add_log(trigger, "skipped", 0, 0, "Campagne déjà en cours")
+        raise CampaignAlreadyRunning("Une campagne newsletter est déjà en cours")
+    try:
+        return _run(trigger)
+    finally:
+        if not _lock_already_acquired:
+            _campaign_lock.release()
+
+
+def _run(trigger: str) -> dict:
+    """Implémentation du pipeline, appelée après acquisition du verrou."""
     settings = database.get_settings()
     try:
         context, items = build_context(settings)
@@ -144,13 +178,15 @@ def run(trigger: str = "manual") -> dict:
     html = render_html(settings, context, for_email=True, with_unsub=bool(app_url))
     subject = f"{context['title']} — {datetime.date.today().strftime('%d/%m/%Y')}"
 
-    sent = 0
     errors = []
+    send_result = mailer.SendResult(total=len(subscribers), sent=0, failures=[])
     try:
-        sent = mailer.send_html(
+        send_result = mailer.send_html(
             settings, subscribers, subject, html,
             _logo_path(settings), inline_images, unsub_urls,
         )
+        if send_result.failures:
+            errors.append(f"SMTP partiel : {send_result.failed} échec(s) ({'; '.join(send_result.failures[:5])})")
     except Exception as exc:
         log.exception("Échec de l'envoi SMTP")
         errors.append(f"SMTP : {exc}")
@@ -164,14 +200,14 @@ def run(trigger: str = "manual") -> dict:
     # Archive : version navigateur (images distantes, sans désinscription).
     try:
         database.add_archive(
-            subject, len(items), sent,
+            subject, len(items), send_result.sent,
             render_html(settings, context, for_email=False),
         )
     except Exception as exc:
         log.exception("Échec de l'archivage")
         errors.append(f"Archive : {exc}")
 
-    status = "ok" if not errors else ("partial" if sent else "error")
-    detail = f"{sent}/{len(subscribers)} emails envoyés. " + " | ".join(errors)
-    database.add_log(trigger, status, len(items), sent, detail.strip())
-    return {"status": status, "items": len(items), "sent": sent, "errors": errors}
+    status = "ok" if not errors else ("partial" if send_result.sent else "error")
+    detail = f"{send_result.sent}/{len(subscribers)} emails envoyés. " + " | ".join(errors)
+    database.add_log(trigger, status, len(items), send_result.sent, detail.strip())
+    return {"status": status, "items": len(items), "sent": send_result.sent, "errors": errors}

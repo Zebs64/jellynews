@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import auth, database, scheduler
 from .routers import api
+from .version import APP_VERSION, ASSET_VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -29,6 +30,8 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=database.UPLOADS_DIR), name="uploads")
 
 templates = Jinja2Templates(directory=BASE_DIR / "templates" / "web")
+templates.env.globals["app_version"] = APP_VERSION
+templates.env.globals["asset_version"] = ASSET_VERSION
 
 app.include_router(api.router)
 

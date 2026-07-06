@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.0.3 — Cache-buster et throttling SMTP
+
+- Version applicative centralisée en `1.0.3` et réutilisée par le client Jellyfin, l'export JSON et l'interface.
+- Assets web versionnés avec `?v=1.0.3` pour éviter le hard refresh navigateur après release (`style.css`, `app.js` et SVG statiques concernés).
+- Envoi newsletter maintenu en messages individuels : un seul destinataire en `To`, aucun `Cc/Bcc`, header `List-Unsubscribe` propre quand l'URL publique est configurée.
+- Throttling SMTP configurable par taille de vague et pause entre vagues, avec validation de bornes.
+- `/api/send-now` lance la campagne en arrière-plan et refuse un second lancement concurrent.
+- Logs d'envoi enrichis : total destinataires, succès, échecs partiels masqués et statut synthétique.
+- Documentation de délivrabilité ajoutée : SPF/DKIM/DMARC, réputation IP/domaine, quotas SMTP, désinscription et limites du verrou en mémoire.
+- Rollback précisé : sauvegarder `data/`, restaurer l'image précédente et purger le cache proxy si nécessaire.
+
+Documentation détaillée : `docs/releases/v1.0.3.md`.
+
 ## v1.0.2 — Sauvegarde complète et UI Media Current
 
 - Export JSON `/api/settings/export` étendu : configuration, abonnés, historique des envois et archives de newsletters.
