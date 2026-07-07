@@ -53,7 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: url('/static/brand/media-current-bg.svg?v=1.1.0') top right / 760px auto no-repeat;
+  background: url('/static/brand/media-current-bg.svg?v=1.1.1') top right / 760px auto no-repeat;
   opacity: .16;
 }
 
@@ -195,7 +195,7 @@ a { color: #7dd3fc; }
   border: 1px solid rgba(0, 245, 212, .20);
   background:
     linear-gradient(135deg, rgba(12, 24, 42, .96), rgba(8, 17, 31, .92) 54%, rgba(0, 164, 220, .10)),
-    url('/static/brand/media-current-bg.svg?v=1.1.0') top right / 760px auto no-repeat;
+    url('/static/brand/media-current-bg.svg?v=1.1.1') top right / 760px auto no-repeat;
 }
 .home-eyebrow {
   margin: 0 0 10px;
@@ -364,6 +364,16 @@ blockquote {
 .status-pill.is-ok { color: var(--jn-ok); border-color: rgba(78, 229, 157, .36); }
 .status-pill.is-error, .status-pill.is-partial { color: var(--jn-danger); border-color: rgba(255, 107, 122, .36); }
 .status-pill.is-skipped { color: var(--jn-muted); }
+.smtp-diagnostic {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(142, 169, 211, .22);
+  border-radius: var(--jn-radius-sm);
+  background: rgba(7, 17, 31, .26);
+  color: var(--jn-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
 .empty-state {
   display: flex;
   align-items: center;
@@ -376,7 +386,7 @@ blockquote {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  background: url('/static/brand/empty-media-mail.svg?v=1.1.0') center / contain no-repeat;
+  background: url('/static/brand/empty-media-mail.svg?v=1.1.1') center / contain no-repeat;
   opacity: .82;
 }
 .empty-state.compact { padding: 8px 0; }

@@ -212,6 +212,38 @@ def run(trigger: str = "manual", *, _lock_already_acquired: bool = False) -> dic
             _campaign_lock.release()
 
 
+def _smtp_retryable_label(value: bool | None) -> str:
+    if value is True:
+        return "temporaire/réessayable"
+    if value is False:
+        return "permanent/non réessayable"
+    return "réessai indéterminé"
+
+
+def _smtp_detail_line(detail: dict) -> str:
+    parts = [detail.get("recipient") or "destinataire masqué"]
+    if detail.get("error_class"):
+        parts.append(str(detail["error_class"]))
+    if detail.get("smtp_code") is not None:
+        parts.append(f"code {detail['smtp_code']}")
+    if detail.get("smtp_category"):
+        parts.append(str(detail["smtp_category"]))
+    parts.append(_smtp_retryable_label(detail.get("retryable")))
+    if detail.get("smtp_error"):
+        parts.append(f"message: {detail['smtp_error']}")
+    if detail.get("smtp_hint"):
+        parts.append(f"aide: {detail['smtp_hint']}")
+    return " — ".join(parts)
+
+
+def _smtp_log_diagnostic(details: list[dict]) -> dict | None:
+    if not details:
+        return None
+    first = dict(details[0])
+    first.pop("recipient", None)
+    return first
+
+
 def _run(trigger: str) -> dict:
     """Implémentation du pipeline, appelée après acquisition du verrou."""
     settings = database.get_settings()
@@ -242,6 +274,7 @@ def _run(trigger: str) -> dict:
 
     errors = []
     send_result = mailer.SendResult(total=len(subscribers), sent=0, failures=[])
+    smtp_log_diagnostic = None
     try:
         send_result = mailer.send_html(
             settings, subscribers, subject, html,
@@ -249,9 +282,11 @@ def _run(trigger: str) -> dict:
         )
         if send_result.failures:
             errors.append(f"SMTP partiel : {send_result.failed} échec(s) ({'; '.join(send_result.failures[:5])})")
+            smtp_log_diagnostic = _smtp_log_diagnostic(send_result.failure_details)
     except Exception as exc:
         log.exception("Échec de l'envoi SMTP")
-        errors.append(f"SMTP : {exc}")
+        smtp_log_diagnostic = mailer.smtp_diagnostic(exc)
+        errors.append(f"SMTP : {smtp_log_diagnostic['error_class']}")
 
     try:
         discord.send_summary(settings, items, context["intro"])
@@ -270,6 +305,14 @@ def _run(trigger: str) -> dict:
         errors.append(f"Archive : {exc}")
 
     status = "ok" if not errors else ("partial" if send_result.sent else "error")
-    detail = f"{send_result.sent}/{len(subscribers)} emails envoyés. " + " | ".join(errors)
-    database.add_log(trigger, status, len(items), send_result.sent, detail.strip())
+    detail_parts = [f"{send_result.sent}/{len(subscribers)} message(s) accepté(s) par le serveur SMTP."]
+    if errors:
+        detail_parts.append(" | ".join(errors))
+    if send_result.failure_details:
+        smtp_lines = [_smtp_detail_line(item) for item in send_result.failure_details[:3]]
+        detail_parts.append("Diagnostic SMTP : " + " || ".join(smtp_lines))
+    elif smtp_log_diagnostic:
+        detail_parts.append("Diagnostic SMTP : " + _smtp_detail_line(smtp_log_diagnostic))
+    detail = " ".join(part for part in detail_parts if part).strip()[:2000]
+    database.add_log(trigger, status, len(items), send_result.sent, detail, smtp_log_diagnostic)
     return {"status": status, "items": len(items), "sent": send_result.sent, "errors": errors}

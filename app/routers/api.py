@@ -202,6 +202,19 @@ def _normalize_send_logs(payload: object) -> list[dict]:
     for index, row in enumerate(payload):
         if not isinstance(row, dict):
             raise HTTPException(400, f"Entrée send_logs invalide à l'index {index}")
+        retryable = row.get("retryable")
+        if isinstance(retryable, bool):
+            retryable = 1 if retryable else 0
+        elif retryable in (None, ""):
+            retryable = None
+        else:
+            retryable = _int_non_negative(retryable, f"send_logs[{index}].retryable")
+            retryable = 1 if retryable else 0
+        smtp_code = row.get("smtp_code")
+        if smtp_code in (None, ""):
+            smtp_code = None
+        else:
+            smtp_code = _int_non_negative(smtp_code, f"send_logs[{index}].smtp_code")
         normalized.append({
             "created_at": _parse_iso_datetime(row.get("created_at"), f"send_logs[{index}].created_at"),
             "trigger": _text(row.get("trigger"), f"send_logs[{index}].trigger"),
@@ -209,6 +222,12 @@ def _normalize_send_logs(payload: object) -> list[dict]:
             "items_count": _int_non_negative(row.get("items_count", 0), f"send_logs[{index}].items_count"),
             "recipients": _int_non_negative(row.get("recipients", 0), f"send_logs[{index}].recipients"),
             "detail": _text(row.get("detail", ""), f"send_logs[{index}].detail", required=False)[:2000],
+            "error_class": _text(row.get("error_class", ""), f"send_logs[{index}].error_class", required=False)[:120],
+            "smtp_code": smtp_code,
+            "smtp_error": _text(row.get("smtp_error", ""), f"send_logs[{index}].smtp_error", required=False)[:500],
+            "smtp_category": _text(row.get("smtp_category", ""), f"send_logs[{index}].smtp_category", required=False)[:120],
+            "smtp_hint": _text(row.get("smtp_hint", ""), f"send_logs[{index}].smtp_hint", required=False)[:500],
+            "retryable": retryable,
         })
     return normalized
 

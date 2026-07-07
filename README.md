@@ -25,8 +25,11 @@ avec en option un résumé sur Discord.
   `List-Unsubscribe` RFC 8058 (bouton natif Gmail/Outlook).
 - **Envois SMTP propres** : un email individuel par abonné, sans `Cc/Bcc`,
   avec throttling par vagues configurables pour limiter les signaux anti-spam.
+- **Diagnostic SMTP détaillé** : l'historique d'envoi distingue les messages
+  acceptés par le serveur SMTP des messages réellement livrés en inbox, et
+  expose code SMTP, message neutralisé, catégorie, aide et caractère réessayable.
 - **Cache-buster applicatif** : les assets statiques modifiables portent la
-  version applicative (`?v=1.1.0`) pour éviter le hard refresh après release.
+  version applicative (`?v=1.1.1`) pour éviter le hard refresh après release.
 - **Templates newsletter** : `Classique` reste le défaut historique ; `Courant
   éditorial`, `Catalogue compact` et `Affiche de séance` sont sélectionnables
   dans l'admin, à partir de la direction Aï documentée pour v1.1.0.
@@ -55,7 +58,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.1.0-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.1.1-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -69,12 +72,17 @@ Depuis **v1.1.0**, l'export inclut aussi `newsletter_template_id` et
 inconnus, les blocs inconnus, les doublons et toute tentative de désactiver un
 bloc obligatoire avant d'écrire en base.
 
+Depuis **v1.1.1**, l'export conserve aussi les diagnostics SMTP stockés dans
+`send_logs` : `error_class`, `smtp_code`, `smtp_error`, `smtp_category`,
+`smtp_hint` et `retryable`. Les anciens exports sans ces champs restent
+compatibles ; les valeurs importées sont normalisées avant stockage.
+
 Limites importantes : l'export n'inclut pas les comptes administrateurs,
 `secret.key`, la base SQLite brute ni les fichiers uploadés comme le logo. Pour
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.1.0.md`](docs/releases/v1.1.0.md).
+Voir aussi : [`docs/releases/v1.1.1.md`](docs/releases/v1.1.1.md).
 
 ## Démarrage
 
@@ -148,6 +156,7 @@ jellynews/
     ├── main.py                     # FastAPI : pages setup/login/dashboard
     ├── database.py                 # SQLite : settings, users, abonnés, logs
     ├── auth.py                     # bcrypt + cookies signés (itsdangerous)
+    ├── smtp_sanitizer.py           # Neutralisation PII/secrets des diagnostics SMTP
     ├── scheduler.py                # APScheduler : cron hebdomadaire configurable
     ├── routers/api.py              # API d'administration (authentifiée)
     ├── services/
@@ -184,6 +193,19 @@ jellynews/
   sans `Cc/Bcc`, avec version texte et headers `List-Unsubscribe` quand
   `app_public_url` est configurée. Ce comportement améliore la propreté de
   l'envoi, mais ne remplace pas SPF, DKIM, DMARC ni une réputation SMTP saine.
+- **Diagnostic SMTP** : les logs enregistrent la classe d'erreur, le code SMTP,
+  le message SMTP neutralisé, la catégorie, l'aide administrateur et l'indication
+  `retryable`. Les codes `4xx` sont traités comme temporaires par défaut ; les
+  `5xx` comme permanents. Les cas connus `550 5.7.1`, `554 5.7.1`, `552 5.3.4`,
+  `451 4.7.0` et `421` disposent de messages d'aide spécifiques.
+- **Limites SMTP** : « accepté par le serveur SMTP » signifie que le relais a
+  pris le message en charge. JellyNews ne reçoit pas les bounces entrants/DSN,
+  ne prouve pas l'arrivée en boîte de réception et ne lance pas de stratégie de
+  retry automatique avancée.
+- **Sécurité des diagnostics** : les réponses SMTP distantes sont considérées
+  comme hostiles. Les emails et secrets évidents sont masqués, les retours ligne
+  et caractères de contrôle normalisés, les champs tronqués et l'interface admin
+  échappe le contenu sans accepter de HTML libre.
 - **Throttling** : `smtp_batch_size` et `smtp_batch_pause_seconds` limitent
   la cadence d'envoi par vagues. Ils doivent être adaptés aux quotas du
   fournisseur SMTP ; JellyNews ne contourne pas ces limites.
