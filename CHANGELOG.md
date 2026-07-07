@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.2 — Mascotte JellyNews sur l’accueil
+
+- Mascotte JellyNews ajoutée au panneau d’accueil administrateur, positionnée en haut à droite du héros façon mockup fourni.
+- Asset transparent `jellynews-mascot.png` embarqué dans les fichiers statiques de marque.
+- Layout responsive ajusté : texte protégé sur desktop/tablette, mascotte replacée au-dessus du titre sur petit écran.
+- Version applicative, cache-buster et client Jellyfin passés en `1.1.2`.
+
+Documentation détaillée : `docs/releases/v1.1.2.md`.
+
 ## v1.1.1 — Diagnostic SMTP détaillé
 
 - Diagnostic SMTP structuré ajouté : classe d’erreur, code SMTP, message neutralisé, catégorie, aide administrateur et caractère réessayable.
