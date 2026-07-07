@@ -28,6 +28,22 @@ class AdminUiSecurityTests(unittest.TestCase):
         self.assertIn("document.createTextNode", block)
         self.assertIn('onfocus="window.__xss=1"', old_vulnerable_markup)
 
+    def test_smtp_diagnostic_rendering_escapes_and_truncates_remote_smtp_text(self):
+        source = (ROOT / "app" / "static" / "app.js").read_text(encoding="utf-8")
+        match = re.search(
+            r"function renderSmtpDiagnostic\(log\) \{(?P<block>.*?)\n\}",
+            source,
+            re.S,
+        )
+        assert match is not None
+        block = match.group("block")
+
+        self.assertIn("escapeHtml(field)", block)
+        self.assertIn("truncateText(log.smtp_error, 500)", block)
+        self.assertIn("truncateText(log.smtp_hint, 500)", block)
+        self.assertNotIn("${log.smtp_error}", block)
+        self.assertNotIn("innerHTML = log.smtp_error", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,11 +4,22 @@ import os
 import sqlite3
 from pathlib import Path
 
+from .smtp_sanitizer import clean_smtp_text
+
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR = DATA_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "jellynews.db"
+SMTP_TEXT_MAX = 500
+SMTP_LOG_COLUMNS = {
+    "error_class": "TEXT NOT NULL DEFAULT ''",
+    "smtp_code": "INTEGER NULL",
+    "smtp_error": "TEXT NOT NULL DEFAULT ''",
+    "smtp_category": "TEXT NOT NULL DEFAULT ''",
+    "smtp_hint": "TEXT NOT NULL DEFAULT ''",
+    "retryable": "INTEGER NULL",
+}
 
 # Valeurs par défaut de toute la configuration. Sert aussi de liste blanche :
 # l'API refuse d'écrire une clé absente d'ici.
@@ -115,10 +126,57 @@ def init_db() -> None:
                 status TEXT NOT NULL,
                 items_count INTEGER NOT NULL DEFAULT 0,
                 recipients INTEGER NOT NULL DEFAULT 0,
-                detail TEXT NOT NULL DEFAULT ''
+                detail TEXT NOT NULL DEFAULT '',
+                error_class TEXT NOT NULL DEFAULT '',
+                smtp_code INTEGER NULL,
+                smtp_error TEXT NOT NULL DEFAULT '',
+                smtp_category TEXT NOT NULL DEFAULT '',
+                smtp_hint TEXT NOT NULL DEFAULT '',
+                retryable INTEGER NULL
             );
             """
         )
+        _ensure_send_log_columns(conn)
+
+
+def _ensure_send_log_columns(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(send_logs)").fetchall()}
+    for name, definition in SMTP_LOG_COLUMNS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE send_logs ADD COLUMN {name} {definition}")
+
+
+def _clean_text(value: object, limit: int) -> str:
+    return clean_smtp_text(value, limit)
+
+
+def _retryable_value(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    try:
+        number = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return 1 if number else 0
+
+
+def _smtp_log_values(log: dict | None) -> dict:
+    log = log or {}
+    smtp_code = log.get("smtp_code")
+    try:
+        smtp_code = int(str(smtp_code)) if smtp_code not in (None, "") else None
+    except (TypeError, ValueError):
+        smtp_code = None
+    return {
+        "error_class": _clean_text(log.get("error_class", ""), 120),
+        "smtp_code": smtp_code,
+        "smtp_error": _clean_text(log.get("smtp_error", ""), SMTP_TEXT_MAX),
+        "smtp_category": _clean_text(log.get("smtp_category", ""), 120),
+        "smtp_hint": _clean_text(log.get("smtp_hint", ""), SMTP_TEXT_MAX),
+        "retryable": _retryable_value(log.get("retryable")),
+    }
 
 
 # ---------------------------------------------------------------- settings --
@@ -166,7 +224,8 @@ def export_backup(app_version: str) -> dict:
             ),
             "send_logs": _rows(
                 conn,
-                "SELECT created_at, trigger, status, items_count, recipients, detail "
+                "SELECT created_at, trigger, status, items_count, recipients, detail, "
+                "error_class, smtp_code, smtp_error, smtp_category, smtp_hint, retryable "
                 "FROM send_logs ORDER BY id",
             ),
             "archives": _rows(
@@ -178,11 +237,18 @@ def export_backup(app_version: str) -> dict:
 
 
 def _exists(conn: sqlite3.Connection, table: str, values: dict) -> bool:
-    columns = list(values)
-    where = " AND ".join(f"{col} = ?" for col in columns)
+    where_parts = []
+    params = []
+    for col, value in values.items():
+        if value is None:
+            where_parts.append(f"{col} IS NULL")
+        else:
+            where_parts.append(f"{col} = ?")
+            params.append(value)
+    where = " AND ".join(where_parts)
     row = conn.execute(
         f"SELECT 1 FROM {table} WHERE {where} LIMIT 1",
-        [values[col] for col in columns],
+        params,
     ).fetchone()
     return row is not None
 
@@ -219,21 +285,30 @@ def import_backup_data(data: dict) -> dict:
             imported["subscribers"] += 1
 
         for log in send_logs:
+            smtp_fields = _smtp_log_values(log)
+            detail = _clean_text(log.get("detail", ""), 2000)
             key = {
                 "created_at": log["created_at"],
                 "trigger": log["trigger"],
                 "status": log["status"],
                 "items_count": log["items_count"],
                 "recipients": log["recipients"],
-                "detail": log["detail"],
+                "detail": detail,
+                **smtp_fields,
             }
             if _exists(conn, "send_logs", key):
                 skipped["send_logs"] += 1
                 continue
             conn.execute(
-                "INSERT INTO send_logs (created_at, trigger, status, items_count, recipients, detail) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (log["created_at"], log["trigger"], log["status"], log["items_count"], log["recipients"], log["detail"]),
+                "INSERT INTO send_logs (created_at, trigger, status, items_count, recipients, detail, "
+                "error_class, smtp_code, smtp_error, smtp_category, smtp_hint, retryable) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    log["created_at"], log["trigger"], log["status"], log["items_count"],
+                    log["recipients"], detail, smtp_fields["error_class"],
+                    smtp_fields["smtp_code"], smtp_fields["smtp_error"], smtp_fields["smtp_category"],
+                    smtp_fields["smtp_hint"], smtp_fields["retryable"],
+                ),
             )
             imported["send_logs"] += 1
 
@@ -344,18 +419,34 @@ def get_archive(archive_id: int):
 
 
 # -------------------------------------------------------------------- logs --
-def add_log(trigger: str, status: str, items_count: int, recipients: int, detail: str = "") -> None:
+def add_log(
+    trigger: str,
+    status: str,
+    items_count: int,
+    recipients: int,
+    detail: str = "",
+    smtp_diagnostic: dict | None = None,
+) -> None:
+    smtp_fields = _smtp_log_values(smtp_diagnostic)
+    clean_detail = _clean_text(detail, 2000)
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO send_logs (created_at, trigger, status, items_count, recipients, detail) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO send_logs (created_at, trigger, status, items_count, recipients, detail, "
+            "error_class, smtp_code, smtp_error, smtp_category, smtp_hint, retryable) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 datetime.datetime.now().isoformat(timespec="seconds"),
                 trigger,
                 status,
                 items_count,
                 recipients,
-                detail[:2000],
+                clean_detail,
+                smtp_fields["error_class"],
+                smtp_fields["smtp_code"],
+                smtp_fields["smtp_error"],
+                smtp_fields["smtp_category"],
+                smtp_fields["smtp_hint"],
+                smtp_fields["retryable"],
             ),
         )
 

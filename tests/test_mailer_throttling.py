@@ -70,6 +70,9 @@ class MailerTests(unittest.TestCase):
         self.assertEqual(result.sent, 2)
         self.assertEqual(result.failed, 1)
         self.assertIn("t***@example.test: SMTPException", result.failures)
+        self.assertEqual(result.failure_details[0]["recipient"], "t***@example.test")
+        self.assertEqual(result.failure_details[0]["error_class"], "SMTPException")
+        self.assertEqual(result.failure_details[0]["smtp_category"], "smtp_unknown")
         self.assertEqual([msg["To"] for msg in fake.messages], ["one@example.test", "three@example.test"])
 
     def test_send_html_masks_recipient_in_smtp_failure_logs(self):

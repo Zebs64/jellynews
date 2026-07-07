@@ -9,8 +9,8 @@ WEB_TEMPLATES = ROOT / "app" / "templates" / "web"
 
 
 class CacheBusterTests(unittest.TestCase):
-    def test_app_version_is_1_1_0(self):
-        self.assertEqual(APP_VERSION, "1.1.0")
+    def test_app_version_is_1_1_1(self):
+        self.assertEqual(APP_VERSION, "1.1.1")
         self.assertEqual(ASSET_VERSION, APP_VERSION)
 
     def test_web_templates_version_mutable_assets(self):
@@ -49,8 +49,8 @@ class CacheBusterTests(unittest.TestCase):
 
     def test_css_versions_static_svg_backgrounds(self):
         source = (ROOT / "app" / "static" / "style.css").read_text(encoding="utf-8")
-        self.assertIn("/static/brand/media-current-bg.svg?v=1.1.0", source)
-        self.assertIn("/static/brand/empty-media-mail.svg?v=1.1.0", source)
+        self.assertIn("/static/brand/media-current-bg.svg?v=1.1.1", source)
+        self.assertIn("/static/brand/empty-media-mail.svg?v=1.1.1", source)
         self.assertNotIn("media-current-bg.svg')", source)
         self.assertNotIn("empty-media-mail.svg')", source)
 

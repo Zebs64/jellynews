@@ -11,12 +11,15 @@ de désinscription propre à chaque destinataire.
 """
 import logging
 import mimetypes
+import re
 import smtplib
 import ssl
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.message import EmailMessage
 from pathlib import Path
+
+from ..smtp_sanitizer import SMTP_TEXT_MAX, clean_smtp_text, mask_email
 
 log = logging.getLogger("jellynews.mailer")
 
@@ -27,6 +30,37 @@ SMTP_BATCH_SIZE_MIN = 1
 SMTP_BATCH_SIZE_MAX = 500
 SMTP_BATCH_PAUSE_MIN = 0
 SMTP_BATCH_PAUSE_MAX = 3600
+SMTP_DIAGNOSTIC_TEXT_MAX = SMTP_TEXT_MAX
+
+_ENHANCED_STATUS_RE = re.compile(r"\b([245]\.\d\.\d)\b")
+
+_SMTP_HINTS: dict[tuple[int | None, str | None], tuple[str, str, bool | None]] = {
+    (550, "5.7.1"): (
+        "rejet_policy_spam",
+        "Rejet anti-spam, politique serveur ou réputation expéditeur. Vérifier SPF/DKIM/DMARC, réputation IP/domaine et contenu.",
+        False,
+    ),
+    (554, "5.7.1"): (
+        "contenu_policy_refuse",
+        "Contenu refusé, réputation ou règle de politique. Vérifier contenu, liens, réputation et authentification domaine.",
+        False,
+    ),
+    (552, "5.3.4"): (
+        "message_trop_gros",
+        "Message trop volumineux. Réduire images intégrées, nombre de médias ou poids HTML.",
+        False,
+    ),
+    (451, "4.7.0"): (
+        "rate_limit_greylisting",
+        "Limite temporaire, greylisting ou ralentissement requis. Augmenter la pause entre vagues SMTP.",
+        True,
+    ),
+    (421, None): (
+        "service_temporaire_throttle",
+        "Service indisponible, quota ou throttling temporaire. Réessayer plus tard et réduire le débit.",
+        True,
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +68,7 @@ class SendResult:
     total: int
     sent: int
     failures: list[str]
+    failure_details: list[dict] = field(default_factory=list)
 
     @property
     def failed(self) -> int:
@@ -61,11 +96,84 @@ def throttle_settings(settings: dict) -> tuple[int, int]:
 
 
 def _masked_recipient(email: str) -> str:
-    local, sep, domain = email.partition("@")
-    if not sep:
-        return "destinataire invalide"
-    head = local[:1] or "?"
-    return f"{head}***@{domain}"
+    return mask_email(email)
+
+
+def _clean_smtp_text(value: object, limit: int = SMTP_DIAGNOSTIC_TEXT_MAX) -> str:
+    return clean_smtp_text(value, limit)
+
+
+def _smtp_code(value: object) -> int | None:
+    try:
+        code = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return code if 100 <= code <= 999 else None
+
+
+def _first_recipient_refusal(exc: smtplib.SMTPRecipientsRefused) -> tuple[int | None, object]:
+    for refusal in exc.recipients.values():
+        if isinstance(refusal, tuple) and len(refusal) >= 2:
+            return _smtp_code(refusal[0]), refusal[1]
+    return None, ""
+
+
+def _extract_smtp_response(exc: BaseException) -> tuple[int | None, str]:
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        code, raw_error = _first_recipient_refusal(exc)
+        return code, _clean_smtp_text(raw_error)
+    code = _smtp_code(getattr(exc, "smtp_code", None))
+    raw_error = getattr(exc, "smtp_error", "")
+    return code, _clean_smtp_text(raw_error)
+
+
+def _classify_smtp(exc: BaseException, smtp_code: int | None, smtp_error: str) -> tuple[str, str, bool | None]:
+    enhanced = None
+    match = _ENHANCED_STATUS_RE.search(smtp_error)
+    if match:
+        enhanced = match.group(1)
+    if (smtp_code, enhanced) in _SMTP_HINTS:
+        return _SMTP_HINTS[(smtp_code, enhanced)]
+    if (smtp_code, None) in _SMTP_HINTS:
+        return _SMTP_HINTS[(smtp_code, None)]
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return "smtp_auth", "Authentification SMTP refusée. Vérifier identifiant, mot de passe et politique du fournisseur.", False
+    if smtp_code is not None:
+        if 400 <= smtp_code < 500:
+            return (
+                "smtp_temporaire",
+                "Erreur temporaire SMTP, potentiellement réessayable après délai.",
+                True,
+            )
+        if 500 <= smtp_code < 600:
+            return (
+                "smtp_permanent",
+                "Erreur SMTP permanente ou politique serveur. Corriger configuration, destinataire, contenu ou réputation avant nouvel essai.",
+                False,
+            )
+    if isinstance(exc, smtplib.SMTPServerDisconnected):
+        return "smtp_disconnected", "Connexion SMTP interrompue. Réessayer plus tard et vérifier stabilité réseau/serveur.", True
+    if isinstance(exc, smtplib.SMTPException):
+        return "smtp_unknown", "Erreur SMTP non catégorisée. Consulter le message et les journaux du fournisseur.", None
+    if isinstance(exc, (TimeoutError, ConnectionError, ssl.SSLError)):
+        return "network_error", "Erreur réseau ou TLS pendant l'échange SMTP. Vérifier connectivité, port, TLS et disponibilité du serveur.", True
+    if isinstance(exc, OSError):
+        return "network_error", "Erreur système ou réseau pendant l'envoi SMTP. Vérifier connectivité, DNS, port et pare-feu.", True
+    return "smtp_unknown", "Erreur SMTP non catégorisée. Consulter le message et les journaux du fournisseur.", None
+
+
+def smtp_diagnostic(exc: BaseException) -> dict:
+    """Diagnostic SMTP pur, borné et sans PII brute exploitable côté admin."""
+    smtp_code, smtp_error = _extract_smtp_response(exc)
+    category, hint, retryable = _classify_smtp(exc, smtp_code, smtp_error)
+    return {
+        "error_class": type(exc).__name__,
+        "smtp_code": smtp_code,
+        "smtp_error": smtp_error,
+        "smtp_category": category,
+        "smtp_hint": _clean_smtp_text(hint),
+        "retryable": retryable,
+    }
 
 
 def _build_message(
@@ -138,6 +246,7 @@ def send_html(
     batch_size, pause_seconds = throttle_settings(settings)
     sent = 0
     failures: list[str] = []
+    failure_details: list[dict] = []
     with _connect(settings) as server:
         total = len(recipients)
         for index, recipient in enumerate(recipients, start=1):
@@ -149,9 +258,11 @@ def send_html(
                 server.send_message(msg)
                 sent += 1
             except (smtplib.SMTPException, OSError) as exc:
-                log.exception("Échec d'envoi à %s", _masked_recipient(recipient))
-                failures.append(f"{_masked_recipient(recipient)}: {type(exc).__name__}")
+                masked = _masked_recipient(recipient)
+                log.exception("Échec d'envoi à %s", masked)
+                failures.append(f"{masked}: {type(exc).__name__}")
+                failure_details.append({"recipient": masked, **smtp_diagnostic(exc)})
             if index < total and index % batch_size == 0 and pause_seconds:
                 log.info("Pause SMTP %ss après %s/%s destinataires", pause_seconds, index, total)
                 time.sleep(pause_seconds)
-    return SendResult(total=len(recipients), sent=sent, failures=failures)
+    return SendResult(total=len(recipients), sent=sent, failures=failures, failure_details=failure_details)

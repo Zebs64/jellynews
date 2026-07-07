@@ -343,6 +343,29 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function truncateText(text, limit = 500) {
+  const value = String(text || '').replace(/[\r\n]+/g, ' ').trim();
+  return value.length > limit ? value.slice(0, limit) + '…' : value;
+}
+
+function retryableLabel(value) {
+  if (value === true || value === 1) return 'Temporaire / réessayable';
+  if (value === false || value === 0) return 'Permanent / non réessayable';
+  return 'Réessai indéterminé';
+}
+
+function renderSmtpDiagnostic(log) {
+  const fields = [];
+  if (log.error_class) fields.push(`Classe : ${truncateText(log.error_class, 120)}`);
+  if (log.smtp_code !== null && log.smtp_code !== undefined && log.smtp_code !== '') fields.push(`Code : ${log.smtp_code}`);
+  if (log.smtp_category) fields.push(`Catégorie : ${truncateText(log.smtp_category, 120)}`);
+  if (log.retryable !== null && log.retryable !== undefined && log.retryable !== '') fields.push(retryableLabel(log.retryable));
+  if (log.smtp_error) fields.push(`Message : ${truncateText(log.smtp_error, 500)}`);
+  if (log.smtp_hint) fields.push(`Aide : ${truncateText(log.smtp_hint, 500)}`);
+  if (!fields.length) return '';
+  return `<div class="smtp-diagnostic">${fields.map((field) => `<div>${escapeHtml(field)}</div>`).join('')}</div>`;
+}
+
 function emptyRow(cols, message) {
   return `<tr><td colspan="${cols}"><div class="empty-state compact">${escapeHtml(message)}</div></td></tr>`;
 }
@@ -519,7 +542,7 @@ async function loadLogs() {
         <td><span class="status-pill is-${klass}">${status}</span></td>
         <td>${l.items_count}</td>
         <td>${l.recipients}</td>
-        <td>${escapeHtml(l.detail || '')}</td>
+        <td>${escapeHtml(l.detail || '')}${renderSmtpDiagnostic(l)}</td>
       </tr>`;
   }).join('') || emptyRow(6, 'Aucun envoi pour le moment.');
 }
@@ -554,7 +577,7 @@ $('#btn-test-email').addEventListener('click', (e) =>
         method: 'POST',
         body: JSON.stringify({ to: $('#test-email-to').value }),
       });
-      toast('Email de test envoyé ✔');
+      toast('Email de test accepté par le serveur SMTP ✔');
     } catch (err) {
       toast('Erreur : ' + err.message, true);
     }
@@ -570,7 +593,7 @@ $('#btn-send-now').addEventListener('click', (e) => {
       if (result.queued) {
         toast('Campagne lancée en arrière-plan ✔');
       } else {
-        toast(`Terminé : ${result.sent} email(s) envoyés, ${result.items} médias (${result.status})`);
+        toast(`Terminé : ${result.sent} message(s) accepté(s) par le serveur SMTP, ${result.items} médias (${result.status})`);
       }
       await Promise.all([loadLogs(), loadArchives(), loadDashboardSummary()]);
     } catch (err) {

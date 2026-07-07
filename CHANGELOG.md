@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.1 — Diagnostic SMTP détaillé
+
+- Diagnostic SMTP structuré ajouté : classe d’erreur, code SMTP, message neutralisé, catégorie, aide administrateur et caractère réessayable.
+- Mappings opérationnels pour `550 5.7.1`, `554 5.7.1`, `552 5.3.4`, `451 4.7.0`, `421`, plus règles générales `4xx` temporaires et `5xx` permanentes.
+- Historique admin enrichi avec affichage échappé/tronqué des diagnostics SMTP, sans HTML libre.
+- `send_logs` migré avec colonnes SMTP idempotentes et export/import rétrocompatible avec les sauvegardes anciennes.
+- Formulation corrigée : messages “acceptés par le serveur SMTP”, sans promesse de livraison inbox.
+- Limites explicitement documentées : pas de bounce entrant/DSN, pas de preuve inbox et pas de retry automatique avancé.
+- Version applicative, cache-buster et client Jellyfin passés en `1.1.1`.
+
+Documentation détaillée : `docs/releases/v1.1.1.md`.
+
 ## v1.1.0 — Templates newsletter et éditeur contrôlé
 
 - Template historique conservé comme `Classique` et défaut rétrocompatible.

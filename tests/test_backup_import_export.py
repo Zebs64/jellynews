@@ -73,7 +73,7 @@ class BackupImportExportTests(unittest.TestCase):
         self.assertNotIn("users", backup)
         self.assertNotIn("password_hash", dump)
         self.assertNotIn("secret.key", dump)
-        self.assertIn("jellynews-backup-v1.1.0-secrets.json", response.headers["content-disposition"])
+        self.assertIn("jellynews-backup-v1.1.1-secrets.json", response.headers["content-disposition"])
 
     def test_import_legacy_settings_only_export_still_works(self):
         result = self.import_payload({
@@ -128,6 +128,149 @@ class BackupImportExportTests(unittest.TestCase):
         self.assertEqual(len(database.list_logs()), 1)
         self.assertEqual(len(database.list_archives()), 1)
         self.assertEqual(database.get_settings()["schedule_hour"], "9")
+
+    def test_import_export_preserves_smtp_diagnostic_fields_and_legacy_logs(self):
+        database.add_log(
+            "manual", "partial", 4, 1, "1/2 message(s) accepté(s) par le serveur SMTP.",
+            {
+                "error_class": "SMTPDataError",
+                "smtp_code": 550,
+                "smtp_error": "5.7.1 rejet policy",
+                "smtp_category": "rejet_policy_spam",
+                "smtp_hint": "Vérifier SPF/DKIM/DMARC.",
+                "retryable": False,
+            },
+        )
+        backup = json.loads(bytes(api.export_settings().body).decode("utf-8"))
+        exported = backup["send_logs"][0]
+
+        self.assertEqual(exported["error_class"], "SMTPDataError")
+        self.assertEqual(exported["smtp_code"], 550)
+        self.assertEqual(exported["retryable"], 0)
+
+        self.tmp.cleanup()
+        self.tmp = tempfile.TemporaryDirectory()
+        database.DATA_DIR = Path(self.tmp.name)
+        database.UPLOADS_DIR = Path(self.tmp.name) / "uploads"
+        database.UPLOADS_DIR.mkdir(exist_ok=True)
+        database.DB_PATH = Path(self.tmp.name) / "jellynews.db"
+        database.init_db()
+
+        imported = self.import_payload(backup)
+        self.assertEqual(imported["imported"]["send_logs"], 1)
+        stored = database.list_logs()[0]
+        self.assertEqual(stored["error_class"], "SMTPDataError")
+        self.assertEqual(stored["smtp_code"], 550)
+        self.assertEqual(stored["smtp_category"], "rejet_policy_spam")
+        self.assertEqual(stored["retryable"], 0)
+
+        legacy = {
+            "schema_version": 2,
+            "settings": {},
+            "subscribers": [],
+            "send_logs": [{
+                "created_at": "2026-07-06T10:02:00",
+                "trigger": "manual",
+                "status": "ok",
+                "items_count": 4,
+                "recipients": 1,
+                "detail": "legacy",
+            }],
+            "archives": [],
+        }
+        legacy_result = self.import_payload(legacy)
+        legacy_row = database.list_logs()[0]
+        self.assertEqual(legacy_result["imported"]["send_logs"], 1)
+        self.assertEqual(legacy_row["detail"], "legacy")
+        self.assertEqual(legacy_row["error_class"], "")
+        self.assertIsNone(legacy_row["smtp_code"])
+
+    def test_imported_send_logs_are_sanitized_before_storage_and_export(self):
+        payload = {
+            "schema_version": 2,
+            "settings": {},
+            "subscribers": [],
+            "send_logs": [{
+                "created_at": "2026-07-06T10:02:00",
+                "trigger": "manual",
+                "status": "error",
+                "items_count": 0,
+                "recipients": 1,
+                "detail": "SMTP refused victim@example.test\r\npassword=secret token=abcdef <script>alert(1)</script>",
+                "error_class": "<script>SMTPDataError</script>",
+                "smtp_code": 550,
+                "smtp_error": "550 victim@example.test password=secret token=abcdef <img src=x onerror=alert(1)>",
+                "smtp_category": "policy\r\n<script>",
+                "smtp_hint": "secret=supersecret for victim@example.test",
+                "retryable": False,
+            }],
+            "archives": [],
+        }
+
+        result = self.import_payload(payload)
+        second = self.import_payload(payload)
+        stored = database.list_logs()[0]
+        exported = database.export_backup("test")["send_logs"][0]
+
+        self.assertEqual(result["imported"]["send_logs"], 1)
+        self.assertEqual(second["skipped"]["send_logs"], 1)
+        self.assertEqual(len(database.list_logs()), 1)
+        for row in (stored, exported):
+            dump = json.dumps(row, ensure_ascii=False)
+            self.assertNotIn("victim@example.test", dump)
+            self.assertNotIn("password=secret", dump)
+            self.assertNotIn("token=abcdef", dump)
+            self.assertNotIn("secret=supersecret", dump)
+            self.assertNotIn("\r", dump)
+            self.assertNotIn("\n", dump)
+            self.assertNotIn("<script>", dump)
+            self.assertNotIn("<img", dump)
+            self.assertNotIn("onerror", dump)
+            self.assertIn("v***@example.test", dump)
+            self.assertIn("[redacted]", dump)
+
+    def test_imported_send_logs_redact_quoted_smtp_secrets_before_storage_and_export(self):
+        payload = {
+            "schema_version": 2,
+            "settings": {},
+            "subscribers": [],
+            "send_logs": [{
+                "created_at": "2026-07-06T10:02:00",
+                "trigger": "manual",
+                "status": "error",
+                "items_count": 0,
+                "recipients": 1,
+                "detail": 'SMTP auth failed victim@example.test password="secret" token="abcdef" api_key="supersecret"',
+                "error_class": "SMTPAuthenticationError",
+                "smtp_code": 535,
+                "smtp_error": '535 5.7.8 auth failed password="secret" token="abcdef" api_key="supersecret"',
+                "smtp_category": "smtp_auth",
+                "smtp_hint": "check password='secret' token='abcdef' for victim@example.test",
+                "retryable": False,
+            }],
+            "archives": [],
+        }
+
+        result = self.import_payload(payload)
+        stored = database.list_logs()[0]
+        exported = database.export_backup("test")["send_logs"][0]
+
+        self.assertEqual(result["imported"]["send_logs"], 1)
+        for row in (stored, exported):
+            dump = json.dumps(row, ensure_ascii=False)
+            self.assertNotIn("victim@example.test", dump)
+            self.assertNotIn('password="secret"', dump)
+            self.assertNotIn('token="abcdef"', dump)
+            self.assertNotIn('api_key="supersecret"', dump)
+            self.assertNotIn("password='secret'", dump)
+            self.assertNotIn("token='abcdef'", dump)
+            self.assertNotIn("secret", dump)
+            self.assertNotIn("abcdef", dump)
+            self.assertNotIn("supersecret", dump)
+            self.assertIn("v***@example.test", dump)
+            self.assertIn("password=[redacted]", dump)
+            self.assertIn("token=[redacted]", dump)
+            self.assertIn("api_key=[redacted]", dump)
 
     def test_reimport_export_with_existing_local_archive_is_idempotent(self):
         database.add_archive("JellyNews", 4, 1, "<h1>Archive locale</h1>")
