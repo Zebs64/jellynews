@@ -42,6 +42,42 @@ def get_settings():
     return settings
 
 
+@router.get("/dashboard-summary")
+def dashboard_summary():
+    """Résumé KISS de l'accueil admin.
+
+    Route protégée par la dépendance globale du router : aucune métrique n'est
+    exposée hors session administrateur.
+    """
+    settings = database.get_settings()
+    logs = database.list_logs(1)
+    recent_items_count: int | None = None
+    recent_items_error = ""
+    try:
+        recent_items_count = len(jellyfin.fetch_recent_items(settings))
+    except Exception:
+        recent_items_error = "Nouveautés indisponibles : configurez ou testez Jellyfin."
+
+    last_send = None
+    if logs:
+        log = logs[0]
+        last_send = {
+            "created_at": log.get("created_at"),
+            "status": log.get("status"),
+            "items_count": log.get("items_count", 0),
+            "recipients": log.get("recipients", 0),
+        }
+
+    return {
+        "next_run": scheduler.next_run_iso(),
+        "lookback_days": int(settings.get("lookback_days") or 7),
+        "recent_items_count": recent_items_count,
+        "recent_items_error": recent_items_error,
+        "subscribers_count": len(database.list_subscribers()),
+        "last_send": last_send,
+    }
+
+
 def _validate_settings(payload: dict) -> None:
     if payload.get("timezone"):
         try:

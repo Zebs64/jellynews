@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.4 — Accueil dashboard et navigation active
+
+- Accueil admin ajouté comme panneau par défaut, avec bouton Accueil en tête de sidebar et raccourci via le logo JellyNews.
+- Résumé opérationnel protégé par session admin : prochain envoi, nouveautés Jellyfin sur la période configurée, abonnés actifs et dernier envoi.
+- Correction du bouton actif de sidebar : suppression du pseudo-élément vertical parasite sans retirer l'état actif ni le focus clavier visible.
+- Assets web et client Jellyfin préparés en `1.0.4` pour cache-buster de release.
+
+Documentation détaillée : `docs/releases/v1.0.4.md`.
+
 ## v1.0.3 — Cache-buster et throttling SMTP
 
 - Version applicative centralisée en `1.0.3` et réutilisée par le client Jellyfin, l'export JSON et l'interface.

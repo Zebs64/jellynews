@@ -14,15 +14,16 @@
 <body>
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand-lockup">
+    <button class="brand-lockup brand-home" type="button" data-panel="panel-home" aria-label="Retour à l'accueil JellyNews">
       <img class="brand-mark" src="/static/brand/jellynews-mark.svg?v={{ asset_version }}" alt="" aria-hidden="true">
       <div class="brand-text">
         <span class="brand-name">JellyNews</span>
         <span class="brand-subtitle">Media digest</span>
       </div>
-    </div>
+    </button>
     <nav>
-      <button class="nav-btn active" data-panel="panel-jellyfin">Jellyfin</button>
+      <button class="nav-btn active" data-panel="panel-home">Accueil</button>
+      <button class="nav-btn" data-panel="panel-jellyfin">Jellyfin</button>
       <button class="nav-btn" data-panel="panel-smtp">SMTP</button>
       <button class="nav-btn" data-panel="panel-llm">IA / LLM</button>
       <button class="nav-btn" data-panel="panel-schedule">Planification</button>
@@ -43,8 +44,42 @@
   <main class="content">
     <div id="toast" class="toast hidden"></div>
 
+    <!-- =============================== Accueil ============================ -->
+    <section id="panel-home" class="panel home-panel">
+      <div class="home-hero">
+        <p class="home-eyebrow">Jellyfin → newsletter</p>
+        <h2>Le courant hebdomadaire de votre médiathèque.</h2>
+        <p class="home-intro">Pilotez le flux qui transforme les nouveautés Jellyfin en newsletter lisible : vérifiez le prochain envoi, les médias détectés, vos abonnés et le dernier passage du courant.</p>
+        <div class="home-metrics" aria-label="Résumé JellyNews">
+          <article class="home-metric is-primary">
+            <span class="home-metric-label">Prochain envoi</span>
+            <strong id="home-next-run-value">—</strong>
+            <span id="home-next-run-detail" class="home-metric-detail">Chargement…</span>
+          </article>
+          <article class="home-metric">
+            <span class="home-metric-label">Nouveautés trouvées</span>
+            <strong id="home-recent-count-value">—</strong>
+            <span id="home-recent-count-detail" class="home-metric-detail">Selon la période configurée.</span>
+          </article>
+          <article class="home-metric">
+            <span class="home-metric-label">Abonnés actifs</span>
+            <strong id="home-subscribers-value">—</strong>
+            <span id="home-subscribers-detail" class="home-metric-detail">Destinataires prêts à recevoir le courant.</span>
+          </article>
+          <article class="home-metric">
+            <span class="home-metric-label">Dernier envoi</span>
+            <strong id="home-last-send-value">—</strong>
+            <span id="home-last-send-detail" class="home-metric-detail">Aucun historique chargé.</span>
+          </article>
+        </div>
+        <div class="row home-actions">
+          <button type="button" class="btn" id="btn-refresh-dashboard">Actualiser le résumé</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ============================== Jellyfin ============================ -->
-    <section id="panel-jellyfin" class="panel">
+    <section id="panel-jellyfin" class="panel hidden">
       <div class="panel-heading">
         <h2>Serveur Jellyfin</h2>
         <p>Connectez votre médiathèque et choisissez ce qui entre dans le courant hebdomadaire.</p>

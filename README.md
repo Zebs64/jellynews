@@ -26,7 +26,10 @@ avec en option un résumé sur Discord.
 - **Envois SMTP propres** : un email individuel par abonné, sans `Cc/Bcc`,
   avec throttling par vagues configurables pour limiter les signaux anti-spam.
 - **Cache-buster applicatif** : les assets statiques modifiables portent la
-  version applicative (`?v=1.0.3`) pour éviter le hard refresh après release.
+  version applicative (`?v=1.0.4`) pour éviter le hard refresh après release.
+- **Accueil admin** : page par défaut avec résumé du prochain envoi, des
+  nouveautés détectées, des abonnés actifs et du dernier envoi ; le logo
+  JellyNews ramène à cet accueil.
 - **Filtrage par bibliothèque** : cochez les bibliothèques Jellyfin à inclure.
 - **Titres et affiches cliquables** : deep links vers la fiche Jellyfin.
 - **Archives** : chaque newsletter envoyée est consultable depuis l'admin.
@@ -47,7 +50,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.0.3-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.0.4-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -61,7 +64,7 @@ Limites importantes : l'export n'inclut pas les comptes administrateurs,
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.0.3.md`](docs/releases/v1.0.3.md).
+Voir aussi : [`docs/releases/v1.0.4.md`](docs/releases/v1.0.4.md).
 
 ## Démarrage
 

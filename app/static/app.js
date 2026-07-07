@@ -33,18 +33,63 @@ async function api(path, options = {}) {
 }
 
 /* ---------------------------------------------------------- navigation -- */
-$$('.nav-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    $$('.nav-btn').forEach((b) => b.classList.remove('active'));
-    $$('.panel').forEach((p) => p.classList.add('hidden'));
-    btn.classList.add('active');
-    $('#' + btn.dataset.panel).classList.remove('hidden');
-  });
+function activatePanel(panelId) {
+  $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.panel === panelId));
+  $$('.panel').forEach((p) => p.classList.add('hidden'));
+  const panel = $('#' + panelId);
+  if (panel) panel.classList.remove('hidden');
+}
+
+$$('[data-panel]').forEach((btn) => {
+  btn.addEventListener('click', () => activatePanel(btn.dataset.panel));
 });
 
 /* ------------------------------------------------------------ settings -- */
+function formatDateTime(iso) {
+  return iso ? new Date(iso).toLocaleString('fr-FR') : 'désactivé';
+}
+
+function metricText(id, value) {
+  const el = $('#' + id);
+  if (el) el.textContent = value;
+}
+
 function setNextRun(iso) {
-  $('#next-run').textContent = iso ? new Date(iso).toLocaleString('fr-FR') : 'désactivé';
+  const value = formatDateTime(iso);
+  $('#next-run').textContent = value;
+  metricText('home-next-run-value', value);
+  metricText('home-next-run-detail', iso ? 'Planification active.' : 'Envoi automatique désactivé.');
+}
+
+function formatMediaCount(count) {
+  if (count === null || count === undefined) return '—';
+  return `${count} média${count > 1 ? 's' : ''}`;
+}
+
+function renderLastSend(log) {
+  if (!log) {
+    metricText('home-last-send-value', 'Aucun envoi');
+    metricText('home-last-send-detail', 'L’historique est vide.');
+    return;
+  }
+  metricText('home-last-send-value', log.status || 'inconnu');
+  metricText(
+    'home-last-send-detail',
+    `${formatDateTime(log.created_at)} — ${log.items_count || 0} média(s), ${log.recipients || 0} destinataire(s)`,
+  );
+}
+
+async function loadDashboardSummary() {
+  const summary = await (await api('/api/dashboard-summary')).json();
+  setNextRun(summary.next_run);
+  metricText('home-recent-count-value', formatMediaCount(summary.recent_items_count));
+  metricText(
+    'home-recent-count-detail',
+    summary.recent_items_error || `Sur ${summary.lookback_days || 7} jour(s) configuré(s).`,
+  );
+  metricText('home-subscribers-value', String(summary.subscribers_count || 0));
+  metricText('home-subscribers-detail', 'Abonnés actifs en base.');
+  renderLastSend(summary.last_send);
 }
 
 async function loadSettings() {
@@ -78,6 +123,7 @@ $$('.settings-form').forEach((form) => {
         body: JSON.stringify(payload),
       })).json();
       setNextRun(result.next_run);
+      await loadDashboardSummary();
       toast('Configuration enregistrée ✔');
     } catch (err) {
       toast('Erreur : ' + err.message, true);
@@ -136,6 +182,7 @@ function statusClass(value) {
 
 async function loadSubscribers() {
   const subs = await (await api('/api/subscribers')).json();
+  metricText('home-subscribers-value', String(subs.length));
   $('#subscribers-body').innerHTML = subs.map((s) => `
     <tr>
       <td>${escapeHtml(s.email)}</td>
@@ -277,6 +324,7 @@ async function loadArchives() {
 /* ---------------------------------------------------------------- logs -- */
 async function loadLogs() {
   const logs = await (await api('/api/logs')).json();
+  renderLastSend(logs[0]);
   $('#logs-body').innerHTML = logs.map((l) => {
     const status = escapeHtml(l.status || 'unknown');
     const klass = statusClass(l.status);
@@ -307,6 +355,8 @@ $('#btn-test-jellyfin').addEventListener('click', (e) =>
   withBusy(e.target, 'Test en cours…', async () => {
     try {
       const result = await (await api('/api/test/jellyfin', { method: 'POST' })).json();
+      metricText('home-recent-count-value', formatMediaCount(result.count));
+      metricText('home-recent-count-detail', 'Dernier test Jellyfin manuel.');
       toast(`Connexion OK — ${result.count} nouveautés (${result.sample.join(', ') || 'aucune'})`);
     } catch (err) {
       toast('Erreur : ' + err.message, true);
@@ -338,13 +388,23 @@ $('#btn-send-now').addEventListener('click', (e) => {
       } else {
         toast(`Terminé : ${result.sent} email(s) envoyés, ${result.items} médias (${result.status})`);
       }
-      await Promise.all([loadLogs(), loadArchives()]);
+      await Promise.all([loadLogs(), loadArchives(), loadDashboardSummary()]);
     } catch (err) {
       toast('Erreur : ' + err.message, true);
-      await Promise.all([loadLogs(), loadArchives()]);
+      await Promise.all([loadLogs(), loadArchives(), loadDashboardSummary()]);
     }
   });
 });
+
+$('#btn-refresh-dashboard').addEventListener('click', (e) =>
+  withBusy(e.target, 'Actualisation…', async () => {
+    try {
+      await loadDashboardSummary();
+      toast('Résumé actualisé ✔');
+    } catch (err) {
+      toast('Erreur : ' + err.message, true);
+    }
+  }));
 
 /* ------------------------------------------------------ fuseaux horaires -- */
 async function loadTimezones() {
@@ -356,6 +416,7 @@ async function loadTimezones() {
 (async () => {
   try {
     await Promise.all([loadSettings(), loadSubscribers(), loadLogs(), loadArchives(), loadTimezones()]);
+    await loadDashboardSummary();
   } catch (err) {
     toast('Erreur de chargement : ' + err.message, true);
   }
