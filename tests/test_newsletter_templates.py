@@ -138,7 +138,7 @@ class NewsletterApiTests(unittest.TestCase):
 
         self.assertEqual(backup["settings"]["newsletter_template_id"], "compact")
         self.assertIn("newsletter_blocks_json", backup["settings"])
-        self.assertIn("jellynews-backup-v1.1.1-secrets.json", api.export_settings().headers["content-disposition"])
+        self.assertIn("jellynews-backup-v1.1.2-secrets.json", api.export_settings().headers["content-disposition"])
 
     def test_invalid_settings_reject_without_persistence(self):
         with self.assertRaises(HTTPException) as ctx:

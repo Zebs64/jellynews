@@ -53,7 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: url('/static/brand/media-current-bg.svg?v=1.1.1') top right / 760px auto no-repeat;
+  background: url('/static/brand/media-current-bg.svg?v=1.1.2') top right / 760px auto no-repeat;
   opacity: .16;
 }
 
@@ -189,13 +189,29 @@ a { color: #7dd3fc; }
 /* -------------------------------------------------------------- accueil -- */
 .home-panel { padding: 0; overflow: hidden; }
 .home-hero {
+  position: relative;
   min-height: 430px;
   padding: 32px;
   border-radius: var(--jn-radius-lg);
   border: 1px solid rgba(0, 245, 212, .20);
   background:
     linear-gradient(135deg, rgba(12, 24, 42, .96), rgba(8, 17, 31, .92) 54%, rgba(0, 164, 220, .10)),
-    url('/static/brand/media-current-bg.svg?v=1.1.1') top right / 760px auto no-repeat;
+    url('/static/brand/media-current-bg.svg?v=1.1.2') top right / 760px auto no-repeat;
+}
+.home-hero > :not(.home-mascot) {
+  position: relative;
+  z-index: 1;
+}
+.home-mascot {
+  position: absolute;
+  z-index: 0;
+  top: 18px;
+  right: 20px;
+  width: clamp(168px, 19vw, 248px);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 18px 34px rgba(0, 8, 22, .42));
 }
 .home-eyebrow {
   margin: 0 0 10px;
@@ -207,6 +223,7 @@ a { color: #7dd3fc; }
 }
 .home-hero h2 {
   max-width: 760px;
+  padding-right: clamp(160px, 21vw, 260px);
   margin: 0;
   font-size: clamp(34px, 6vw, 58px);
   line-height: .98;
@@ -214,6 +231,7 @@ a { color: #7dd3fc; }
 }
 .home-intro {
   max-width: 720px;
+  padding-right: clamp(120px, 16vw, 210px);
   margin: 22px 0 0;
   color: var(--jn-muted);
   font-size: 17px;
@@ -386,7 +404,7 @@ blockquote {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  background: url('/static/brand/empty-media-mail.svg?v=1.1.1') center / contain no-repeat;
+  background: url('/static/brand/empty-media-mail.svg?v=1.1.2') center / contain no-repeat;
   opacity: .82;
 }
 .empty-state.compact { padding: 8px 0; }
@@ -482,6 +500,9 @@ blockquote {
   .nav-btn { white-space: nowrap; }
   .sidebar-footer { flex-direction: row; justify-content: space-between; }
   .content { padding: 22px 20px 36px; max-width: none; }
+  .home-mascot { width: clamp(142px, 24vw, 190px); opacity: .92; }
+  .home-hero h2 { padding-right: clamp(108px, 24vw, 160px); }
+  .home-intro { padding-right: clamp(72px, 18vw, 128px); }
   .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .newsletter-template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -492,6 +513,17 @@ blockquote {
   .panel h2 { font-size: 23px; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .home-hero { min-height: 0; padding: 24px; }
+  .home-mascot {
+    position: relative;
+    display: block;
+    top: auto;
+    right: auto;
+    width: min(220px, 66vw);
+    margin: -8px auto 12px;
+    opacity: 1;
+  }
+  .home-hero h2,
+  .home-intro { padding-right: 0; }
   .home-metrics { grid-template-columns: 1fr; }
   .newsletter-template-grid { grid-template-columns: 1fr; }
   .block-editor-heading, .block-row { align-items: stretch; flex-direction: column; }
