@@ -53,7 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: url('/static/brand/media-current-bg.svg?v=1.0.3') top right / 760px auto no-repeat;
+  background: url('/static/brand/media-current-bg.svg?v=1.0.4') top right / 760px auto no-repeat;
   opacity: .16;
 }
 
@@ -103,6 +103,22 @@ body::before {
 
 .brand-name { font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
 .brand-subtitle { color: var(--jn-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
+.brand-home {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.brand-home:hover .brand-name { color: var(--jn-cyan); }
+.brand-home:focus-visible {
+  outline: none;
+  border-radius: var(--jn-radius-sm);
+  box-shadow: var(--jn-focus);
+}
 
 /* ----------------------------------------------------------- structure -- */
 .layout {
@@ -146,16 +162,6 @@ body::before {
   border-color: rgba(0, 245, 212, .42);
   font-weight: 800;
 }
-.nav-btn.active::before {
-  content: "";
-  position: absolute;
-  left: 6px;
-  top: 9px;
-  bottom: 9px;
-  width: 3px;
-  border-radius: 999px;
-  background: rgba(7, 17, 31, .85);
-}
 .sidebar-footer { font-size: 13px; color: var(--jn-muted); display: flex; flex-direction: column; gap: 4px; padding-top: 16px; }
 a { color: #7dd3fc; }
 .sidebar-footer a { color: var(--jn-cyan); }
@@ -179,6 +185,75 @@ a { color: #7dd3fc; }
 .panel-heading { margin-bottom: 24px; }
 .panel-heading p { color: var(--jn-muted); margin: 0; line-height: 1.6; }
 .current-divider { height: 1px; margin: 22px 0; background: linear-gradient(90deg, transparent, rgba(0, 245, 212, .45), rgba(124, 77, 255, .35), transparent); }
+
+/* -------------------------------------------------------------- accueil -- */
+.home-panel { padding: 0; overflow: hidden; }
+.home-hero {
+  min-height: 430px;
+  padding: 32px;
+  border-radius: var(--jn-radius-lg);
+  border: 1px solid rgba(0, 245, 212, .20);
+  background:
+    linear-gradient(135deg, rgba(12, 24, 42, .96), rgba(8, 17, 31, .92) 54%, rgba(0, 164, 220, .10)),
+    url('/static/brand/media-current-bg.svg?v=1.0.4') top right / 760px auto no-repeat;
+}
+.home-eyebrow {
+  margin: 0 0 10px;
+  color: var(--jn-cyan);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.home-hero h2 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: .98;
+  letter-spacing: -.055em;
+}
+.home-intro {
+  max-width: 720px;
+  margin: 22px 0 0;
+  color: var(--jn-muted);
+  font-size: 17px;
+  line-height: 1.58;
+}
+.home-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 32px;
+}
+.home-metric {
+  min-height: 112px;
+  padding: 18px;
+  background: rgba(16, 28, 45, .72);
+  border: 1px solid rgba(32, 52, 74, .86);
+  border-radius: var(--jn-radius-md);
+}
+.home-metric.is-primary { border-color: rgba(0, 245, 212, .34); box-shadow: inset 0 1px 0 rgba(0, 245, 212, .14); }
+.home-metric-label {
+  display: block;
+  color: var(--jn-muted);
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.home-metric strong {
+  display: block;
+  color: var(--jn-text);
+  font-size: clamp(24px, 3vw, 30px);
+  line-height: 1.12;
+}
+.home-metric-detail {
+  display: block;
+  color: var(--jn-muted);
+  font-size: 13px;
+  line-height: 1.38;
+  margin-top: 8px;
+}
+.home-actions { margin-top: 22px; }
 
 /* ----------------------------------------------------------- formulaires -- */
 label { display: block; margin-bottom: 16px; color: var(--jn-text); font-weight: 650; }
@@ -301,7 +376,7 @@ blockquote {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  background: url('/static/brand/empty-media-mail.svg?v=1.0.3') center / contain no-repeat;
+  background: url('/static/brand/empty-media-mail.svg?v=1.0.4') center / contain no-repeat;
   opacity: .82;
 }
 .empty-state.compact { padding: 8px 0; }
@@ -339,6 +414,7 @@ blockquote {
   .nav-btn { white-space: nowrap; }
   .sidebar-footer { flex-direction: row; justify-content: space-between; }
   .content { padding: 22px 20px 36px; max-width: none; }
+  .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -346,6 +422,8 @@ blockquote {
   .panel { padding: 20px; border-radius: var(--jn-radius-md); }
   .panel h2 { font-size: 23px; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .home-hero { min-height: 0; padding: 24px; }
+  .home-metrics { grid-template-columns: 1fr; }
   .row { align-items: stretch; }
   .row .btn, .row .inline-input { width: 100%; }
   .auth-card { padding: 26px; }
