@@ -102,6 +102,7 @@ async function loadSettings() {
       else input.value = value;
     });
   });
+  await loadNewsletterEditor(settings);
   setNextRun(settings._next_run);
   if (settings.logo_filename) {
     const img = $('#logo-preview');
@@ -110,9 +111,162 @@ async function loadSettings() {
   }
 }
 
+let newsletterEditorMeta = null;
+let newsletterBlocksState = [];
+
+function blockMeta(blockId) {
+  return (newsletterEditorMeta?.blocks || []).find((block) => block.id === blockId) || { id: blockId, label: blockId, mandatory: false };
+}
+
+function defaultNewsletterBlocks() {
+  try {
+    return JSON.parse(newsletterEditorMeta.default_blocks_json);
+  } catch (_) {
+    return (newsletterEditorMeta?.blocks || []).map((block) => ({ id: block.id, enabled: true }));
+  }
+}
+
+function parseNewsletterBlocks(value) {
+  if (!value) return defaultNewsletterBlocks();
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : defaultNewsletterBlocks();
+  } catch (_) {
+    return defaultNewsletterBlocks();
+  }
+}
+
+function normalizeNewsletterBlocks(rawBlocks) {
+  const known = new Set((newsletterEditorMeta?.blocks || []).map((block) => block.id));
+  const seen = new Set();
+  const normalized = [];
+  rawBlocks.forEach((block) => {
+    const id = String(block.id || '');
+    if (!known.has(id) || seen.has(id)) return;
+    const meta = blockMeta(id);
+    normalized.push({ id, enabled: meta.mandatory ? true : block.enabled !== false });
+    seen.add(id);
+  });
+  (newsletterEditorMeta?.blocks || []).forEach((meta) => {
+    if (!seen.has(meta.id)) normalized.push({ id: meta.id, enabled: true });
+  });
+  return normalized;
+}
+
+function syncNewsletterBlocksInput() {
+  const input = $('#newsletter-blocks-json');
+  if (!input) return;
+  input.value = JSON.stringify(newsletterBlocksState.map((block) => ({ id: block.id, enabled: !!block.enabled })));
+}
+
+function renderNewsletterTemplates(selectedId) {
+  const select = $('#newsletter-template-id');
+  const cards = $('#newsletter-template-cards');
+  if (!select || !cards || !newsletterEditorMeta) return;
+  select.textContent = '';
+  cards.textContent = '';
+  newsletterEditorMeta.templates.forEach((template) => {
+    const option = document.createElement('option');
+    option.value = template.id;
+    option.textContent = template.name;
+    select.append(option);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'template-card';
+    button.dataset.templateId = template.id;
+    button.classList.toggle('active', template.id === selectedId);
+
+    const visual = document.createElement('span');
+    visual.className = `template-mini template-mini-${template.id}`;
+    visual.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 4; i += 1) {
+      visual.append(document.createElement('i'));
+    }
+
+    const title = document.createElement('strong');
+    title.textContent = template.name;
+    const desc = document.createElement('small');
+    desc.textContent = template.description || '';
+    button.append(visual, title, desc);
+    if (template.badge) {
+      const badge = document.createElement('span');
+      badge.className = 'template-badge';
+      badge.textContent = template.badge;
+      button.append(badge);
+    }
+    button.addEventListener('click', () => {
+      select.value = template.id;
+      renderNewsletterTemplates(template.id);
+    });
+    cards.append(button);
+  });
+  select.value = selectedId;
+}
+
+function renderNewsletterBlocks() {
+  const list = $('#newsletter-block-list');
+  if (!list) return;
+  list.textContent = '';
+  newsletterBlocksState.forEach((block, index) => {
+    const meta = blockMeta(block.id);
+    const row = document.createElement('div');
+    row.className = 'block-row';
+
+    const label = document.createElement('label');
+    label.className = 'checkbox block-toggle';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = !!block.enabled;
+    checkbox.disabled = !!meta.mandatory;
+    checkbox.dataset.blockIndex = String(index);
+    const name = document.createElement('span');
+    name.textContent = meta.label;
+    if (meta.mandatory) {
+      const mandatory = document.createElement('small');
+      mandatory.textContent = 'Obligatoire';
+      label.append(checkbox, name, mandatory);
+    } else {
+      label.append(checkbox, name);
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'block-controls';
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'btn mini';
+    up.textContent = '↑';
+    up.dataset.moveBlock = 'up';
+    up.dataset.blockIndex = String(index);
+    up.disabled = block.id === 'preheader' || index === 0;
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'btn mini';
+    down.textContent = '↓';
+    down.dataset.moveBlock = 'down';
+    down.dataset.blockIndex = String(index);
+    down.disabled = block.id === 'footer' || index === newsletterBlocksState.length - 1;
+    controls.append(up, down);
+    row.append(label, controls);
+    list.append(row);
+  });
+  syncNewsletterBlocksInput();
+}
+
+async function loadNewsletterEditor(settings) {
+  if (!newsletterEditorMeta) {
+    newsletterEditorMeta = await (await api('/api/newsletter/templates')).json();
+  }
+  const selectedId = settings.newsletter_template_id || newsletterEditorMeta.default_template_id;
+  newsletterBlocksState = normalizeNewsletterBlocks(parseNewsletterBlocks(settings.newsletter_blocks_json));
+  renderNewsletterTemplates(selectedId);
+  renderNewsletterBlocks();
+}
+
 $$('.settings-form').forEach((form) => {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    syncNewsletterBlocksInput();
     const payload = {};
     form.querySelectorAll('[name]').forEach((input) => {
       payload[input.name] = input.type === 'checkbox' ? (input.checked ? '1' : '0') : input.value;
@@ -130,6 +284,36 @@ $$('.settings-form').forEach((form) => {
     }
   });
 });
+
+$('#newsletter-template-id').addEventListener('change', (event) => {
+  renderNewsletterTemplates(event.target.value);
+});
+
+$('#newsletter-block-list').addEventListener('change', (event) => {
+  const index = Number(event.target.dataset.blockIndex);
+  if (!Number.isInteger(index) || !newsletterBlocksState[index]) return;
+  newsletterBlocksState[index].enabled = !!event.target.checked;
+  syncNewsletterBlocksInput();
+});
+
+$('#newsletter-block-list').addEventListener('click', (event) => {
+  const direction = event.target.dataset.moveBlock;
+  if (!direction) return;
+  const index = Number(event.target.dataset.blockIndex);
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (!newsletterBlocksState[index] || !newsletterBlocksState[target]) return;
+  if (newsletterBlocksState[index].id === 'preheader' || newsletterBlocksState[index].id === 'footer') return;
+  if (newsletterBlocksState[target].id === 'preheader' || newsletterBlocksState[target].id === 'footer') return;
+  [newsletterBlocksState[index], newsletterBlocksState[target]] = [newsletterBlocksState[target], newsletterBlocksState[index]];
+  renderNewsletterBlocks();
+});
+
+$('#btn-reset-newsletter-blocks').addEventListener('click', () => {
+  newsletterBlocksState = normalizeNewsletterBlocks(defaultNewsletterBlocks());
+  renderNewsletterBlocks();
+});
+
+$('#btn-preview-branding').addEventListener('click', () => window.open('/api/preview', '_blank'));
 
 /* ---------------------------------------------------------------- logo -- */
 $('#logo-form').addEventListener('submit', async (event) => {

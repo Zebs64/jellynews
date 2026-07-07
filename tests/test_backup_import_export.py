@@ -73,7 +73,7 @@ class BackupImportExportTests(unittest.TestCase):
         self.assertNotIn("users", backup)
         self.assertNotIn("password_hash", dump)
         self.assertNotIn("secret.key", dump)
-        self.assertIn("jellynews-backup-v1.0.4-secrets.json", response.headers["content-disposition"])
+        self.assertIn("jellynews-backup-v1.1.0-secrets.json", response.headers["content-disposition"])
 
     def test_import_legacy_settings_only_export_still_works(self):
         result = self.import_payload({
@@ -182,6 +182,28 @@ class BackupImportExportTests(unittest.TestCase):
         self.assertEqual(database.get_settings()["schedule_hour"], database.DEFAULTS["schedule_hour"])
         self.assertEqual(database.list_subscribers(), [])
         self.assertEqual(database.list_logs(), [])
+
+    def test_import_rejects_dangerous_public_urls_without_partial_restore(self):
+        payload = {
+            "schema_version": 2,
+            "settings": {
+                "timezone": "Europe/Paris",
+                "jellyfin_url": "https://jellyfin.example.test",
+                "jellyfin_external_url": "data:text/html,<b>x</b>",
+            },
+            "subscribers": [],
+            "send_logs": [],
+            "archives": [],
+        }
+
+        with patch.object(api.scheduler, "reschedule") as reschedule:
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(api.import_settings(cast(Any, DummyUpload(payload))))
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        reschedule.assert_not_called()
+        self.assertEqual(database.get_settings()["timezone"], database.DEFAULTS["timezone"])
+        self.assertEqual(database.get_settings()["jellyfin_external_url"], "")
 
 
 if __name__ == "__main__":

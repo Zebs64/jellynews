@@ -4,7 +4,7 @@ services:
     container_name: jellynews
     restart: unless-stopped
     ports:
-      - "8050:8000"          # http://localhost:8050
+      - "${DEVSANDBOX_PORT:-8050}:8000"  # local: 8050 ; sandbox: port injecté
     environment:
       # Fuseau par défaut ; modifiable ensuite dans l'interface (Planification).
       - TZ=Europe/Paris

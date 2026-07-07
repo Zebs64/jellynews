@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.0 — Templates newsletter et éditeur contrôlé
+
+- Template historique conservé comme `Classique` et défaut rétrocompatible.
+- Nouveaux templates email-safe issus de la direction Aï v1.1.0 : `Courant éditorial`, `Catalogue compact` et `Affiche de séance`.
+- Panneau Apparence / Newsletter étendu : sélection template, blocs contrôlés, activation/désactivation des blocs optionnels, réordonnancement ↑ ↓, reset et preview.
+- Validation serveur stricte : registre de templates, blocs connus uniques, blocs obligatoires verrouillés, aucun HTML libre.
+- Preview admin et email de test basculés sur le rendu newsletter réel, avec échantillon contrôlé si Jellyfin est indisponible.
+- Export/import JSON complet enrichi avec `newsletter_template_id` et `newsletter_blocks_json`, rétrocompatible avec les sauvegardes legacy.
+- Staging v1.1.0 validé avant documentation, avec revue Makise et verdict sécurité Futaba approuvés.
+- Version applicative, cache-buster et client Jellyfin passés en `1.1.0`.
+
+Documentation détaillée : `docs/releases/v1.1.0.md`.
+
 ## v1.0.4 — Accueil dashboard et navigation active
 
 - Accueil admin ajouté comme panneau par défaut, avec bouton Accueil en tête de sidebar et raccourci via le logo JellyNews.

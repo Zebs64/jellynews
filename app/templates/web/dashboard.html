@@ -161,7 +161,7 @@
         <div class="row">
           <button type="submit" class="btn primary">Enregistrer</button>
           <input type="email" id="test-email-to" placeholder="adresse@test.fr" class="inline-input">
-          <button type="button" class="btn" id="btn-test-email">Envoyer un email de test</button>
+          <button type="button" class="btn" id="btn-test-email">Envoyer une newsletter test</button>
         </div>
       </form>
     </section>
@@ -241,8 +241,8 @@
 
     <!-- ============================== Apparence =========================== -->
     <section id="panel-branding" class="panel hidden">
-      <h2>Apparence de la newsletter</h2>
-      <form class="settings-form" data-keys="newsletter_title,app_public_url">
+      <h2>Apparence / Newsletter</h2>
+      <form class="settings-form" data-keys="newsletter_title,app_public_url,newsletter_template_id,newsletter_blocks_json">
         <label>Titre de la newsletter
           <input type="text" name="newsletter_title">
         </label>
@@ -250,7 +250,26 @@
           <input type="url" name="app_public_url" placeholder="https://jellynews.mondomaine.fr">
           <small>Sert à construire le lien « Se désinscrire » dans les emails. Vide = pas de lien.</small>
         </label>
-        <button type="submit" class="btn primary">Enregistrer</button>
+        <label>Template newsletter
+          <select name="newsletter_template_id" id="newsletter-template-id"></select>
+          <small>Le template Classique conserve le rendu historique par défaut.</small>
+        </label>
+        <input type="hidden" name="newsletter_blocks_json" id="newsletter-blocks-json">
+        <div class="newsletter-template-grid" id="newsletter-template-cards" aria-label="Templates newsletter"></div>
+        <div class="block-editor">
+          <div class="block-editor-heading">
+            <div>
+              <h3>Blocs activés</h3>
+              <p class="info">Blocs connus uniquement. Aucun HTML libre n'est accepté ; les blocs obligatoires restent verrouillés.</p>
+            </div>
+            <button type="button" class="btn" id="btn-reset-newsletter-blocks">Reset blocs</button>
+          </div>
+          <div id="newsletter-block-list" class="block-list"></div>
+        </div>
+        <div class="row">
+          <button type="submit" class="btn primary">Enregistrer</button>
+          <button type="button" class="btn" id="btn-preview-branding">👁 Prévisualiser</button>
+        </div>
       </form>
       <h3>Logo personnalisé</h3>
       <div class="logo-zone">
