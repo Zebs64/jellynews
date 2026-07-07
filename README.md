@@ -9,6 +9,10 @@ avec en option un résumé sur Discord.
 
 ## Aperçu
 
+| Accueil |
+|:---:|
+| ![Accueil JellyNews](screenshots/00-accueil.png) |
+
 | Jellyfin | SMTP | IA / LLM |
 |:---:|:---:|:---:|
 | ![Jellyfin](screenshots/01-jellyfin.png) | ![SMTP](screenshots/02-smtp.png) | ![LLM](screenshots/03-llm.png) |
@@ -16,6 +20,10 @@ avec en option un résumé sur Discord.
 | Planification | Envoi & Logs |
 |:---:|:---:|
 | ![Planification](screenshots/04-planification.png) | ![Envoi & logs](screenshots/05-envoi-logs.webp) |
+
+| Exemple de newsletter générée |
+|:---:|
+| ![Exemple de newsletter générée](screenshots/06-newsletter-preview.png) |
 
 ## Fonctionnalités
 
@@ -29,7 +37,7 @@ avec en option un résumé sur Discord.
   acceptés par le serveur SMTP des messages réellement livrés en inbox, et
   expose code SMTP, message neutralisé, catégorie, aide et caractère réessayable.
 - **Cache-buster applicatif** : les assets statiques modifiables portent la
-  version applicative (`?v=1.1.1`) pour éviter le hard refresh après release.
+  version applicative (`?v=1.1.2`) pour éviter le hard refresh après release.
 - **Templates newsletter** : `Classique` reste le défaut historique ; `Courant
   éditorial`, `Catalogue compact` et `Affiche de séance` sont sélectionnables
   dans l'admin, à partir de la direction Aï documentée pour v1.1.0.
@@ -58,7 +66,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.1.1-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.1.2-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -82,7 +90,7 @@ Limites importantes : l'export n'inclut pas les comptes administrateurs,
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.1.1.md`](docs/releases/v1.1.1.md).
+Voir aussi : [`docs/releases/v1.1.2.md`](docs/releases/v1.1.2.md).
 
 ## Démarrage
 
