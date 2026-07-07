@@ -63,6 +63,15 @@ DEFAULTS = {
     "schedule_minute": "0",
     "discord_webhook_url": "",
     "newsletter_title": "JellyNews — Les nouveautés de votre médiathèque",
+    "newsletter_template_id": "classic",
+    # JSON normalisé côté serveur : liste ordonnée de blocs connus {id, enabled}.
+    # Les imports legacy sans cette clé retombent sur cette valeur par défaut.
+    "newsletter_blocks_json": "["
+    "{\"id\":\"preheader\",\"enabled\":true},"
+    "{\"id\":\"header\",\"enabled\":true},"
+    "{\"id\":\"intro\",\"enabled\":true},"
+    "{\"id\":\"media_sections\",\"enabled\":true},"
+    "{\"id\":\"footer\",\"enabled\":true}]",
     "logo_filename": "",
 }
 

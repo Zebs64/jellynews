@@ -26,7 +26,12 @@ avec en option un résumé sur Discord.
 - **Envois SMTP propres** : un email individuel par abonné, sans `Cc/Bcc`,
   avec throttling par vagues configurables pour limiter les signaux anti-spam.
 - **Cache-buster applicatif** : les assets statiques modifiables portent la
-  version applicative (`?v=1.0.4`) pour éviter le hard refresh après release.
+  version applicative (`?v=1.1.0`) pour éviter le hard refresh après release.
+- **Templates newsletter** : `Classique` reste le défaut historique ; `Courant
+  éditorial`, `Catalogue compact` et `Affiche de séance` sont sélectionnables
+  dans l'admin, à partir de la direction Aï documentée pour v1.1.0.
+- **Éditeur de blocs contrôlé** : activation des blocs optionnels,
+  réordonnancement ↑ ↓, reset et preview, sans HTML libre ni JS email.
 - **Accueil admin** : page par défaut avec résumé du prochain envoi, des
   nouveautés détectées, des abonnés actifs et du dernier envoi ; le logo
   JellyNews ramène à cet accueil.
@@ -50,7 +55,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.0.4-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.1.0-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -59,12 +64,17 @@ abonnés, logs et archives manquants, ignore les doublons détectés et met à j
 les paramètres connus. Les anciens exports v1.0.1 limités aux paramètres restent
 compatibles ; dans ce cas, seuls les réglages reconnus sont restaurés.
 
+Depuis **v1.1.0**, l'export inclut aussi `newsletter_template_id` et
+`newsletter_blocks_json`. Les imports invalident proprement les templates
+inconnus, les blocs inconnus, les doublons et toute tentative de désactiver un
+bloc obligatoire avant d'écrire en base.
+
 Limites importantes : l'export n'inclut pas les comptes administrateurs,
 `secret.key`, la base SQLite brute ni les fichiers uploadés comme le logo. Pour
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.0.4.md`](docs/releases/v1.0.4.md).
+Voir aussi : [`docs/releases/v1.1.0.md`](docs/releases/v1.1.0.md).
 
 ## Démarrage
 
@@ -107,7 +117,7 @@ Puis ouvrez **http://localhost:8050** :
    (Tableau de bord Jellyfin → Clés API). L'URL publique n'est nécessaire
    qu'en mode « lien » — le mode « incorporé » (par défaut) n'en a pas besoin.
 3. **SMTP** : hôte, port, sécurité (STARTTLS/SSL), identifiants, expéditeur,
-   taille de vague et pause entre vagues. Testez avec le bouton « Email de test ».
+   taille de vague et pause entre vagues. Testez avec le bouton « Newsletter test ».
    Configurez aussi SPF, DKIM et DMARC sur votre domaine d'envoi : JellyNews
    envoie proprement, mais la réputation reste celle de votre domaine SMTP.
    Ajustez les vagues selon les limites horaires et journalières de votre relais.
@@ -115,8 +125,9 @@ Puis ouvrez **http://localhost:8050** :
    En cas d'échec du LLM, un texte de repli est utilisé (l'envoi n'est jamais bloqué).
 5. **Planification** : jour + heure + fuseau horaire de l'envoi hebdomadaire.
 6. **Discord** : URL de webhook (optionnel).
-7. **Apparence** : titre + upload du logo (embarqué dans l'email en pièce jointe inline)
-   + URL publique de JellyNews (nécessaire pour le lien de désinscription dans les emails).
+7. **Apparence / Newsletter** : titre, URL publique de JellyNews, template,
+   blocs contrôlés, preview et upload du logo (embarqué dans l'email en pièce
+   jointe inline).
 8. **Abonnés** : ajoutez les adresses, puis « Prévisualiser » ou « Envoyer maintenant ».
 
 ## Arborescence
@@ -144,9 +155,10 @@ jellynews/
     │   ├── llm.py                  # Intro humoristique (API compatible OpenAI)
     │   ├── mailer.py               # SMTP + logo inline (cid:)
     │   ├── discord.py              # Webhook Discord (embeds)
-    │   └── newsletter.py           # Orchestration + rendu Jinja2
+    │   ├── newsletter.py           # Orchestration + rendu Jinja2
+    │   └── newsletter_templates.py # Registre templates + blocs contrôlés
     ├── templates/
-    │   ├── email/newsletter.html   # Template email (CSS 100 % inliné)
+    │   ├── email/newsletter*.html  # Templates email (CSS 100 % inliné)
     │   └── web/                    # Interface d'administration
     └── static/                     # CSS + JS du portail
 ```
@@ -163,6 +175,11 @@ jellynews/
   supportent ni flexbox ni les feuilles de style externes). Logo en `cid:`
   et affiches en pièces jointes inline (Content-ID) — pas de dépendance à
   une URL publique, affichage garanti partout.
+- **Templates et blocs** : la sélection passe par un registre serveur fixe.
+  Les imports et sauvegardes invalides sont rejetés avec HTTP 400 avant toute
+  persistance partielle ; les anciennes sauvegardes sans ces clés retombent sur
+  `Classique` + blocs par défaut. L'admin consomme `/api/newsletter/templates`
+  pour afficher les templates et les blocs autorisés sans accepter de HTML libre.
 - **Délivrabilité SMTP** : JellyNews envoie un message distinct par abonné,
   sans `Cc/Bcc`, avec version texte et headers `List-Unsubscribe` quand
   `app_public_url` est configurée. Ce comportement améliore la propreté de

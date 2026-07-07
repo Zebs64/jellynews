@@ -53,7 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: url('/static/brand/media-current-bg.svg?v=1.0.4') top right / 760px auto no-repeat;
+  background: url('/static/brand/media-current-bg.svg?v=1.1.0') top right / 760px auto no-repeat;
   opacity: .16;
 }
 
@@ -195,7 +195,7 @@ a { color: #7dd3fc; }
   border: 1px solid rgba(0, 245, 212, .20);
   background:
     linear-gradient(135deg, rgba(12, 24, 42, .96), rgba(8, 17, 31, .92) 54%, rgba(0, 164, 220, .10)),
-    url('/static/brand/media-current-bg.svg?v=1.0.4') top right / 760px auto no-repeat;
+    url('/static/brand/media-current-bg.svg?v=1.1.0') top right / 760px auto no-repeat;
 }
 .home-eyebrow {
   margin: 0 0 10px;
@@ -376,10 +376,68 @@ blockquote {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  background: url('/static/brand/empty-media-mail.svg?v=1.0.4') center / contain no-repeat;
+  background: url('/static/brand/empty-media-mail.svg?v=1.1.0') center / contain no-repeat;
   opacity: .82;
 }
 .empty-state.compact { padding: 8px 0; }
+
+/* ------------------------------------------------------ éditeur newsletter -- */
+.newsletter-template-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+.template-card {
+  min-height: 188px;
+  padding: 14px;
+  text-align: left;
+  color: var(--jn-text);
+  background: rgba(22, 35, 54, .72);
+  border: 1px solid var(--jn-border);
+  border-radius: var(--jn-radius-md);
+  cursor: pointer;
+  font-family: inherit;
+}
+.template-card.active { border-color: var(--jn-cyan); box-shadow: var(--jn-focus); }
+.template-card strong { display: block; margin-top: 10px; }
+.template-card small { display: block; margin-top: 6px; color: var(--jn-muted); line-height: 1.35; }
+.template-badge {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border: 1px solid rgba(0, 245, 212, .32);
+  border-radius: 999px;
+  color: var(--jn-cyan);
+  font-size: 11px;
+  font-weight: 850;
+}
+.template-mini {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  height: 72px;
+  padding: 9px;
+  background: #07111f;
+  border: 1px solid #20344a;
+  border-radius: var(--jn-radius-sm);
+}
+.template-mini i { display: block; border-radius: 5px; background: #101c2d; border: 1px solid #20344a; }
+.template-mini i:first-child { grid-column: 1 / -1; background: #162336; }
+.template-mini-classic i:nth-child(2), .template-mini-classic i:nth-child(3), .template-mini-classic i:nth-child(4) { grid-column: 1 / -1; }
+.template-mini-editorial i:nth-child(2) { grid-column: 1 / -1; min-height: 24px; border-color: #2f80b7; }
+.template-mini-compact { grid-template-columns: 1fr; }
+.template-mini-compact i { min-height: 10px; }
+.template-mini-showcase i:nth-child(2) { grid-row: span 3; min-height: 42px; border-color: #7c4dff; }
+.block-editor { margin-top: 18px; padding: 16px; border: 1px solid var(--jn-border); border-radius: var(--jn-radius-md); background: rgba(7, 17, 31, .30); }
+.block-editor-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.block-editor-heading h3 { margin-top: 0; }
+.block-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.block-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--jn-border); border-radius: var(--jn-radius-sm); background: var(--jn-surface); }
+.block-toggle { margin: 0; }
+.block-toggle small { margin-left: 8px; color: var(--jn-gold); }
+.block-controls { display: flex; gap: 6px; }
+.btn.mini { min-height: 32px; padding: 5px 10px; }
 
 /* ------------------------------------------------------------------ logo -- */
 .logo-zone { display: flex; flex-direction: column; gap: 12px; }
@@ -415,6 +473,7 @@ blockquote {
   .sidebar-footer { flex-direction: row; justify-content: space-between; }
   .content { padding: 22px 20px 36px; max-width: none; }
   .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .newsletter-template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -424,6 +483,8 @@ blockquote {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .home-hero { min-height: 0; padding: 24px; }
   .home-metrics { grid-template-columns: 1fr; }
+  .newsletter-template-grid { grid-template-columns: 1fr; }
+  .block-editor-heading, .block-row { align-items: stretch; flex-direction: column; }
   .row { align-items: stretch; }
   .row .btn, .row .inline-input { width: 100%; }
   .auth-card { padding: 26px; }

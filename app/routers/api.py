@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPExcepti
 from fastapi.responses import HTMLResponse, Response
 
 from .. import auth, database, scheduler
-from ..services import jellyfin, llm, mailer, newsletter
+from ..services import jellyfin, llm, mailer, newsletter, newsletter_templates, urls
 from ..version import APP_VERSION
 
 router = APIRouter(prefix="/api", dependencies=[Depends(auth.require_user)])
@@ -20,6 +20,11 @@ router = APIRouter(prefix="/api", dependencies=[Depends(auth.require_user)])
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ALLOWED_LOGO_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 Mo
+PUBLIC_URL_SETTINGS = {
+    "jellyfin_url": False,
+    "jellyfin_external_url": True,
+    "app_public_url": True,
+}
 
 
 def _validate_int_range(payload: dict, key: str, minimum: int, maximum: int) -> None:
@@ -40,6 +45,16 @@ def get_settings():
     settings["_next_run"] = scheduler.next_run_iso()
     settings["_app_version"] = APP_VERSION
     return settings
+
+
+@router.get("/newsletter/templates")
+def newsletter_template_options():
+    return {
+        "templates": newsletter_templates.template_options(),
+        "blocks": newsletter_templates.block_options(),
+        "default_template_id": newsletter_templates.DEFAULT_TEMPLATE_ID,
+        "default_blocks_json": newsletter_templates.serialize_blocks(newsletter_templates.default_blocks()),
+    }
 
 
 @router.get("/dashboard-summary")
@@ -79,6 +94,15 @@ def dashboard_summary():
 
 
 def _validate_settings(payload: dict) -> None:
+    for key, allow_empty in PUBLIC_URL_SETTINGS.items():
+        if key not in payload:
+            continue
+        try:
+            payload[key] = urls.normalize_public_http_url(
+                payload[key], field=key, allow_empty=allow_empty
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
     if payload.get("timezone"):
         try:
             zoneinfo.ZoneInfo(str(payload["timezone"]))
@@ -95,6 +119,14 @@ def _validate_settings(payload: dict) -> None:
                 raise HTTPException(400, f"IP ou CIDR invalide : {entry}")
     _validate_int_range(payload, "smtp_batch_size", 1, 500)
     _validate_int_range(payload, "smtp_batch_pause_seconds", 0, 3600)
+    try:
+        normalized_newsletter = newsletter_templates.normalize_settings(payload)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if "newsletter_template_id" in payload:
+        payload["newsletter_template_id"] = normalized_newsletter["newsletter_template_id"]
+    if "newsletter_blocks_json" in payload:
+        payload["newsletter_blocks_json"] = normalized_newsletter["newsletter_blocks_json"]
 
 
 def _parse_iso_datetime(value: object, field: str) -> str:
@@ -132,6 +164,11 @@ def _normalize_settings(payload: object) -> dict:
     if not isinstance(payload, dict):
         raise HTTPException(400, "La section settings doit être un objet JSON")
     known = {k: v for k, v in payload.items() if k in database.DEFAULTS}
+    if not str(known.get("jellyfin_url") or "").strip():
+        # Backups exportés avant toute configuration contiennent la valeur par
+        # défaut vide. À l'import, on la traite comme absente pour conserver
+        # l'idempotence sans autoriser une URL Jellyfin vide côté sauvegarde API.
+        known.pop("jellyfin_url", None)
     _validate_settings(known)
     return known
 
@@ -378,13 +415,15 @@ def test_email(payload: dict = Body(...)):
     if not EMAIL_RE.match(to):
         raise HTTPException(400, "Adresse email invalide")
     settings = database.get_settings()
-    html = (
-        "<div style='font-family:sans-serif;background:#0b0f14;color:#e8eef4;padding:24px;'>"
-        "<h2>JellyNews — Test SMTP réussi ✔</h2>"
-        "<p>Si vous lisez ceci, votre configuration SMTP fonctionne.</p></div>"
-    )
     try:
-        result = mailer.send_html(settings, [to], "JellyNews — Email de test", html)
+        context, items = newsletter.build_context(settings)
+        if not items:
+            context, _ = newsletter.sample_context(settings, "Email de test JellyNews : rendu newsletter sans nouveauté détectée sur la période configurée.")
+    except Exception:
+        context, _ = newsletter.sample_context(settings, "Email de test JellyNews : rendu newsletter généré avec un échantillon, Jellyfin étant indisponible.")
+    html = newsletter.render_html(settings, context, for_email=True, with_unsub=False)
+    try:
+        result = mailer.send_html(settings, [to], "JellyNews — Newsletter de test", html, newsletter._logo_path(settings))
     except Exception as exc:
         raise HTTPException(502, f"Échec SMTP : {exc}")
     if not result:
@@ -394,17 +433,14 @@ def test_email(payload: dict = Body(...)):
 
 @router.get("/preview", response_class=HTMLResponse)
 def preview():
-    """Rend la newsletter avec les vraies données Jellyfin + intro LLM."""
+    """Rend la newsletter avec les vraies données Jellyfin ou un échantillon contrôlé."""
     settings = database.get_settings()
     try:
         context, items = newsletter.build_context(settings)
-    except Exception as exc:
-        raise HTTPException(502, f"Prévisualisation impossible : {exc}")
-    if not items:
-        return HTMLResponse(
-            "<p style='font-family:sans-serif;padding:2em;'>"
-            "Aucune nouveauté sur la période configurée.</p>"
-        )
+        if not items:
+            context, _ = newsletter.sample_context(settings, "Prévisualisation : aucune nouveauté réelle détectée, rendu échantillon affiché.")
+    except Exception:
+        context, _ = newsletter.sample_context(settings, "Prévisualisation : Jellyfin indisponible, rendu échantillon affiché.")
     return HTMLResponse(newsletter.render_html(settings, context, for_email=False))
 
 

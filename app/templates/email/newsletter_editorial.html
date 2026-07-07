@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="dark">
+  <title>{{ title }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#07111f; -webkit-text-size-adjust:100%;">
+  <div style="display:none; max-height:0px; overflow:hidden; mso-hide:all;">{{ preheader }}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#07111f;">
+    <tr><td align="center" style="padding:30px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:100%; background-color:#0b1626; border:1px solid #20344a;">
+        {% for block in newsletter_body_blocks %}
+        {% if block.enabled and block.id == 'header' %}
+        <tr><td style="padding:26px 28px 20px 28px; border-bottom:1px solid #20344a;">
+          {% if logo_src %}<img src="{{ logo_src }}" alt="{{ title }}" width="150" style="display:block; max-width:150px; height:auto; margin:0 0 16px 0; border:0;">{% endif %}
+          <p style="margin:0 0 8px 0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.4; color:#9fb0c3; text-transform:uppercase; letter-spacing:1.4px;">{{ period_label }}</p>
+          <h1 style="margin:0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:28px; line-height:1.25; color:#f2f7fb; font-weight:800;">{{ title }}</h1>
+        </td></tr>
+        {% elif block.enabled and block.id == 'intro' and intro %}
+        <tr><td style="padding:24px 28px 8px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#162336; border:1px solid #20344a;">
+            <tr><td style="padding:18px 20px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:15px; line-height:1.65; color:#cfd9e2;">
+              <strong style="display:block; color:#00f5d4; margin-bottom:6px;">Note de programmation</strong>{{ intro }}
+            </td></tr>
+          </table>
+        </td></tr>
+        {% elif block.enabled and block.id == 'media_sections' %}
+        {% for section in sections %}
+        <tr><td style="padding:24px 28px 8px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:18px; font-weight:800; color:#00f5d4;">{{ section.label }}</td>
+            <td width="120" style="border-bottom:2px solid #00a4dc; font-size:1px; line-height:1px;">&nbsp;</td>
+          </tr></table>
+        </td></tr>
+        {% for item in section.entries %}
+        {% set hero = loop.first %}
+        <tr><td style="padding:0 28px {{ '18px' if hero else '12px' }} 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{ '#162336' if hero else '#101c2d' }}; border:1px solid {{ '#2f80b7' if hero else '#20344a' }};">
+            <tr>
+              <td width="{{ '140' if hero else '88' }}" valign="top" style="padding:{{ '16px 0 16px 16px' if hero else '12px 0 12px 12px' }};">
+                {% if item.poster_src %}<a href="{{ item.url }}" style="text-decoration:none;"><img src="{{ item.poster_src }}" alt="{{ item.name }}" width="{{ '140' if hero else '88' }}" style="display:block; width:{{ '140px' if hero else '88px' }}; height:auto; border:0; background-color:#20344a;"></a>{% else %}
+                <table role="presentation" width="{{ '140' if hero else '88' }}" cellpadding="0" cellspacing="0" border="0"><tr><td height="{{ '205' if hero else '128' }}" align="center" valign="middle" style="background-color:#20344a; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:11px; color:#9fb0c3;">Pas d'affiche</td></tr></table>
+                {% endif %}
+              </td>
+              <td valign="top" style="padding:{{ '18px 20px' if hero else '12px 14px' }}; font-family:'Segoe UI', Helvetica, Arial, sans-serif;">
+                <p style="margin:0 0 7px 0; font-size:{{ '20px' if hero else '16px' }}; font-weight:800; line-height:1.35;"><a href="{{ item.url }}" style="color:#f2f7fb; text-decoration:none;">{{ item.name }}</a>{% if item.year %} <span style="font-weight:400; color:#9fb0c3;">({{ item.year }})</span>{% endif %}</p>
+                {% if item.badge %}<p style="margin:0 0 7px 0; font-size:12px; font-weight:700; color:#00a4dc;">{{ item.badge }}</p>{% endif %}
+                {% if item.overview %}<p style="margin:0; font-size:13px; line-height:1.58; color:#9fb0c3;">{{ item.overview }}</p>{% endif %}
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        {% endfor %}
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        <tr><td align="center" style="padding:26px 28px; border-top:1px solid #20344a; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.7; color:#8b98a5;">
+          Newsletter générée automatiquement par JellyNews · {{ now_year }}<br>{% if unsubscribe_url %}<a href="{{ unsubscribe_url }}" style="color:#00a4dc; text-decoration:underline;">Se désinscrire en un clic</a>{% else %}Pour vous désinscrire, répondez simplement à cet e-mail.{% endif %}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

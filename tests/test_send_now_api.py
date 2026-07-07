@@ -12,6 +12,14 @@ from app.routers import api
 
 
 class SendNowApiTests(unittest.TestCase):
+    DANGEROUS_URLS = [
+        "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "//evil.test/path",
+        "jellyfin.example.test",
+    ]
+
     def test_send_now_queues_background_task_without_running_inline(self):
         background_tasks = BackgroundTasks()
         with (
@@ -45,6 +53,24 @@ class SendNowApiTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
 
         api._validate_settings({"smtp_batch_size": "1", "smtp_batch_pause_seconds": "0"})
+
+    def test_url_settings_accept_only_http_or_https_with_host(self):
+        for key in ("jellyfin_url", "jellyfin_external_url", "app_public_url"):
+            for value in self.DANGEROUS_URLS:
+                with self.subTest(key=key, value=value):
+                    with self.assertRaises(HTTPException) as ctx:
+                        api._validate_settings({key: value})
+                    self.assertEqual(ctx.exception.status_code, 400)
+
+        api._validate_settings({
+            "jellyfin_url": "http://jellyfin:8096",
+            "jellyfin_external_url": "https://jellyfin.example.test",
+            "app_public_url": "https://jellynews.example.test",
+        })
+        api._validate_settings({"jellyfin_external_url": "", "app_public_url": ""})
+
+        with self.assertRaises(HTTPException):
+            api._validate_settings({"jellyfin_url": ""})
 
 
 if __name__ == "__main__":

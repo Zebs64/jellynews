@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="dark">
+  <title>{{ title }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#07111f; -webkit-text-size-adjust:100%;">
+  <div style="display:none; max-height:0px; overflow:hidden; mso-hide:all;">{{ preheader }}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#07111f;">
+    <tr><td align="center" style="padding:34px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:100%; background-color:#0b1626; border:1px solid #20344a;">
+        {% for block in newsletter_body_blocks %}
+        {% if block.enabled and block.id == 'header' %}
+        <tr><td align="center" style="padding:30px 28px 10px 28px;">
+          {% if logo_src %}<img src="{{ logo_src }}" alt="{{ title }}" width="160" style="display:block; max-width:160px; height:auto; margin:0 auto 16px auto; border:0;">{% endif %}
+          <h1 style="margin:0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:30px; line-height:1.2; color:#f2f7fb; font-weight:800; letter-spacing:-0.4px;">{{ title }}</h1>
+          <p style="margin:9px 0 0 0; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:13px; color:#9fb0c3;">{{ period_label }}</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;"><tr><td height="2" style="background-color:#7c4dff; font-size:1px; line-height:1px;">&nbsp;</td><td height="2" style="background-color:#00a4dc; font-size:1px; line-height:1px;">&nbsp;</td><td height="2" style="background-color:#00f5d4; font-size:1px; line-height:1px;">&nbsp;</td></tr></table>
+        </td></tr>
+        {% elif block.enabled and block.id == 'intro' and intro %}
+        <tr><td style="padding:18px 28px 10px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#162336; border-left:3px solid #7c4dff; border-right:1px solid #20344a; border-top:1px solid #20344a; border-bottom:1px solid #20344a;"><tr><td style="padding:18px 20px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:15px; line-height:1.65; color:#cfd9e2; font-style:italic;">“{{ intro }}”</td></tr></table>
+        </td></tr>
+        {% elif block.enabled and block.id == 'media_sections' %}
+        {% for section in sections %}
+        <tr><td style="padding:24px 28px 8px 28px; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:19px; font-weight:900; color:#f2f7fb;">{{ section.label }}</td></tr>
+        {% for item in section.entries %}
+        <tr><td style="padding:0 28px 15px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#162336; border:1px solid #2f80b7;">
+            <tr>
+              <td width="128" valign="top" style="padding:14px 0 14px 14px;">
+                {% if item.poster_src %}<a href="{{ item.url }}" style="text-decoration:none;"><img src="{{ item.poster_src }}" alt="{{ item.name }}" width="128" style="display:block; width:128px; height:auto; border:0; background-color:#20344a;"></a>{% else %}<table role="presentation" width="128" cellpadding="0" cellspacing="0" border="0"><tr><td height="188" align="center" valign="middle" style="background-color:#20344a; border:1px solid #2f80b7; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:11px; color:#9fb0c3;">Pas d'affiche</td></tr></table>{% endif %}
+              </td>
+              <td valign="top" style="padding:16px 18px; font-family:'Segoe UI', Helvetica, Arial, sans-serif;">
+                {% if item.badge %}<p style="margin:0 0 8px 0;"><span style="display:inline-block; padding:4px 8px; border:1px solid #20344a; background-color:#07111f; color:#00f5d4; font-size:11px; font-weight:800;">{{ item.badge }}</span></p>{% endif %}
+                <p style="margin:0 0 8px 0; font-size:18px; font-weight:900; line-height:1.35;"><a href="{{ item.url }}" style="color:#f2f7fb; text-decoration:none;">{{ item.name }}</a>{% if item.year %} <span style="font-weight:400; color:#9fb0c3;">({{ item.year }})</span>{% endif %}</p>
+                {% if item.overview %}<p style="margin:0; font-size:13px; line-height:1.6; color:#9fb0c3;">{{ item.overview }}</p>{% endif %}
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        {% endfor %}
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        <tr><td align="center" style="padding:26px 28px; border-top:1px solid #20344a; font-family:'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.7; color:#8b98a5;">
+          Newsletter générée automatiquement par JellyNews · {{ now_year }}<br>{% if unsubscribe_url %}<a href="{{ unsubscribe_url }}" style="color:#00a4dc; text-decoration:underline;">Se désinscrire en un clic</a>{% else %}Pour vous désinscrire, répondez simplement à cet e-mail.{% endif %}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

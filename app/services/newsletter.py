@@ -7,7 +7,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .. import auth, database
-from . import discord, jellyfin, llm, mailer
+from . import discord, jellyfin, llm, mailer, newsletter_templates, urls
 
 log = logging.getLogger("jellynews.newsletter")
 
@@ -94,6 +94,55 @@ def build_context(settings: dict) -> tuple[dict, list[dict]]:
     return context, items
 
 
+def sample_context(settings: dict, detail: str = "") -> tuple[dict, list[dict]]:
+    """Contexte de prévisualisation/test sans dépendre d'un Jellyfin configuré."""
+    today = datetime.date.today()
+    base_url = urls.safe_public_href(settings.get("jellyfin_external_url") or settings.get("jellyfin_url"))
+    items = [
+        {
+            "id": "sample-movie",
+            "type": "Movie",
+            "name": "Le Courant des Abysses",
+            "year": "2026",
+            "badge": "Film",
+            "overview": "Une odyssée sombre et lumineuse, parfaite pour vérifier le rythme visuel de la newsletter.",
+            "url": base_url,
+        },
+        {
+            "id": "sample-series",
+            "type": "Series",
+            "name": "Station 404",
+            "year": "2025",
+            "badge": "Série · Nouveaux épisodes",
+            "overview": "Le chaos hebdomadaire d'une équipe technique qui répare l'impossible avant le café.",
+            "url": base_url,
+        },
+        {
+            "id": "sample-album",
+            "type": "MusicAlbum",
+            "name": "Midnight Packets",
+            "year": "2024",
+            "badge": "Album",
+            "overview": "Synthés nocturnes, basses propres et assez d'énergie pour accompagner un déploiement tardif.",
+            "url": base_url,
+        },
+    ]
+    sections = []
+    for media_type, label in SECTION_ORDER:
+        typed = [item for item in items if item["type"] == media_type]
+        if typed:
+            sections.append({"label": label, "entries": typed})
+    context = {
+        "title": settings.get("newsletter_title", "JellyNews"),
+        "intro": detail or "Prévisualisation JellyNews : voici un échantillon contrôlé pour tester le template sans modifier abonnés, logs ni archives.",
+        "sections": sections,
+        "period_label": f"Prévisualisation du {today.strftime('%d/%m/%Y')}",
+        "preheader": "Prévisualisation de la newsletter JellyNews",
+        "now_year": today.year,
+    }
+    return context, items
+
+
 def download_posters(settings: dict, context: dict) -> dict[str, tuple[bytes, str]]:
     """Télécharge les affiches (via l'URL interne) pour incorporation cid:.
     Marque chaque entrée avec son cid ; les échecs retombent en lien distant."""
@@ -123,10 +172,15 @@ def render_html(settings: dict, context: dict, for_email: bool = True,
     embed = settings.get("poster_mode", "embed") == "embed"
     for section in context["sections"]:
         for item in section["entries"]:
+            item["url"] = urls.safe_public_href(item.get("url"))
             if for_email and embed and item.get("poster_cid"):
                 item["poster_src"] = f"cid:{item['poster_cid']}"
             else:
                 item["poster_src"] = jellyfin.poster_url(settings, item)
+
+    resolved_template = newsletter_templates.resolve(settings)
+    if not resolved_template["block_map"].get("intro", {}).get("enabled", True):
+        context = {**context, "intro": ""}
 
     logo = _logo_path(settings)
     logo_src = None
@@ -134,8 +188,16 @@ def render_html(settings: dict, context: dict, for_email: bool = True,
         logo_src = f"cid:{mailer.LOGO_CID}" if for_email else f"/uploads/{logo.name}"
 
     unsubscribe_url = mailer.UNSUB_PLACEHOLDER if (for_email and with_unsub) else None
-    template = _env.get_template("newsletter.html")
-    return template.render(**context, logo_src=logo_src, unsubscribe_url=unsubscribe_url)
+    template = _env.get_template(resolved_template["template"].template_file)
+    return template.render(
+        **context,
+        logo_src=logo_src,
+        unsubscribe_url=unsubscribe_url,
+        newsletter_template=resolved_template["template"],
+        newsletter_blocks=resolved_template["blocks"],
+        newsletter_body_blocks=resolved_template["body_blocks"],
+        newsletter_block_map=resolved_template["block_map"],
+    )
 
 
 def run(trigger: str = "manual", *, _lock_already_acquired: bool = False) -> dict:
@@ -168,7 +230,7 @@ def _run(trigger: str) -> dict:
     if settings.get("poster_mode", "embed") == "embed":
         inline_images = download_posters(settings, context)
 
-    app_url = (settings.get("app_public_url") or "").rstrip("/")
+    app_url = urls.safe_public_href(settings.get("app_public_url"), fallback="").rstrip("/")
     subscribers = [s["email"] for s in database.list_subscribers()]
     unsub_urls = {
         email: f"{app_url}/unsubscribe/{auth.make_unsubscribe_token(email)}"
