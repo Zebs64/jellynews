@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.3 — Retouche mascotte JellyNews
+
+- Mascotte JellyNews remplacée par la version corrigée fournie, avec l’enveloppe volante proprement détourée.
+- Cache-buster applicatif passé en `1.1.3` pour forcer le rechargement de l’asset corrigé et des styles versionnés.
+- Aucun changement fonctionnel côté backend ou interface hors asset/version.
+
+Documentation détaillée : `docs/releases/v1.1.3.md`.
+
 ## v1.1.2 — Mascotte JellyNews sur l’accueil
 
 - Mascotte JellyNews ajoutée au panneau d’accueil administrateur, positionnée en haut à droite du héros façon mockup fourni.
