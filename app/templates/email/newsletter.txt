@@ -1,0 +1,33 @@
+{#- Version text/plain de la newsletter : même contenu que le HTML, sans mise
+    en page. Non échappée (autoescape limité aux .html) : c'est du texte brut. -#}
+{{ title }}
+{{ period_label }}
+{%- if intro %}
+
+{{ intro }}
+{%- endif %}
+{%- for section in sections %}
+
+
+{{ section.label }}
+{{ "=" * 30 }}
+{%- for item in section.entries %}
+
+* {{ item.name }}{% if item.year %} ({{ item.year }}){% endif %}{% if item.badge %} — {{ item.badge }}{% endif %}
+{%- if item.overview %}
+  {{ item.overview }}
+{%- endif %}
+{%- if item.url %}
+  {{ item.url }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+
+--
+Newsletter générée automatiquement par JellyNews · {{ now_year }}
+{% if unsubscribe_url -%}
+Se désinscrire en un clic : {{ unsubscribe_url }}
+{%- else -%}
+Pour vous désinscrire, répondez simplement à cet e-mail.
+{%- endif %}

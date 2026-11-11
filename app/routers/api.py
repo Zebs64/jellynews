@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(auth.require_user)])
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ALLOWED_LOGO_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 Mo
+SENDER_NAME_MAX = 100
 PUBLIC_URL_SETTINGS = {
     "jellyfin_url": False,
     "jellyfin_external_url": True,
@@ -117,6 +118,14 @@ def _validate_settings(payload: dict) -> None:
                 ipaddress.ip_network(entry, strict=False)
             except ValueError:
                 raise HTTPException(400, f"IP ou CIDR invalide : {entry}")
+    if "smtp_sender_name" in payload:
+        name = str(payload["smtp_sender_name"] or "")
+        if "\r" in name or "\n" in name:
+            raise HTTPException(400, "Le nom d'expéditeur ne doit pas contenir de retour à la ligne")
+        name = name.strip()
+        if len(name) > SENDER_NAME_MAX:
+            raise HTTPException(400, f"Le nom d'expéditeur doit faire au plus {SENDER_NAME_MAX} caractères")
+        payload["smtp_sender_name"] = name
     _validate_int_range(payload, "smtp_batch_size", 1, 500)
     _validate_int_range(payload, "smtp_batch_pause_seconds", 0, 3600)
     try:
@@ -441,8 +450,12 @@ def test_email(payload: dict = Body(...)):
     except Exception:
         context, _ = newsletter.sample_context(settings, "Email de test JellyNews : rendu newsletter généré avec un échantillon, Jellyfin étant indisponible.")
     html = newsletter.render_html(settings, context, for_email=True, with_unsub=False)
+    text = newsletter.render_text(settings, context, with_unsub=False)
     try:
-        result = mailer.send_html(settings, [to], "JellyNews — Newsletter de test", html, newsletter._logo_path(settings))
+        result = mailer.send_html(
+            settings, [to], "JellyNews — Newsletter de test", html,
+            newsletter._logo_path(settings), text=text,
+        )
     except Exception as exc:
         raise HTTPException(502, f"Échec SMTP : {exc}")
     if not result:

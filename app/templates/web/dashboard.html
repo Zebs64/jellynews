@@ -122,7 +122,7 @@
     <!-- ================================ SMTP ============================== -->
     <section id="panel-smtp" class="panel hidden">
       <h2>Serveur SMTP</h2>
-      <form class="settings-form" data-keys="smtp_host,smtp_port,smtp_security,smtp_user,smtp_password,smtp_sender,smtp_batch_size,smtp_batch_pause_seconds">
+      <form class="settings-form" data-keys="smtp_host,smtp_port,smtp_security,smtp_user,smtp_password,smtp_sender,smtp_sender_name,smtp_batch_size,smtp_batch_pause_seconds">
         <div class="grid-2">
           <label>Hôte
             <input type="text" name="smtp_host" placeholder="smtp.exemple.fr">
@@ -146,9 +146,15 @@
             <input type="password" name="smtp_password" autocomplete="off">
           </label>
         </div>
-        <label>Expéditeur (From)
-          <input type="email" name="smtp_sender" placeholder="newsletter@mondomaine.fr">
-        </label>
+        <div class="grid-2">
+          <label>Adresse d'expéditeur (From)
+            <input type="email" name="smtp_sender" placeholder="newsletter@mondomaine.fr">
+          </label>
+          <label>Nom affiché (optionnel)
+            <input type="text" name="smtp_sender_name" maxlength="100" placeholder="JellyNews">
+            <small>Affiché à la place de l'adresse dans la boîte de réception.</small>
+          </label>
+        </div>
         <div class="grid-2">
           <label>Taille de vague SMTP
             <input type="number" name="smtp_batch_size" min="1" max="500">

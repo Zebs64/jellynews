@@ -46,6 +46,8 @@ DEFAULTS = {
     "smtp_user": "",
     "smtp_password": "",
     "smtp_sender": "",
+    # Nom affiché dans le From (« JellyNews <newsletter@domaine> »). Optionnel.
+    "smtp_sender_name": "",
     "smtp_batch_size": "25",
     "smtp_batch_pause_seconds": "2",
     "llm_api_url": "https://openrouter.ai/api/v1",

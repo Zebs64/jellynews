@@ -199,10 +199,11 @@ class NewsletterApiTests(unittest.TestCase):
     def test_test_email_sends_rendered_newsletter_to_single_validated_address(self):
         captured = {}
 
-        def fake_send(settings, recipients, subject, html, logo_path=None, inline_images=None, unsub_urls=None):
+        def fake_send(settings, recipients, subject, html, logo_path=None, inline_images=None, unsub_urls=None, text=None):
             captured["recipients"] = recipients
             captured["subject"] = subject
             captured["html"] = html
+            captured["text"] = text
             return mailer.SendResult(total=1, sent=1, failures=[])
 
         with patch.object(api.newsletter, "build_context", side_effect=RuntimeError("offline")), \
@@ -213,6 +214,7 @@ class NewsletterApiTests(unittest.TestCase):
         self.assertEqual(captured["recipients"], ["Admin@Example.Test"])
         self.assertEqual(captured["subject"], "JellyNews — Newsletter de test")
         self.assertIn("Le Courant des Abysses", captured["html"])
+        self.assertIn("Le Courant des Abysses", captured["text"])
         send_html.assert_called_once()
 
 

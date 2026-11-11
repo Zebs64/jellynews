@@ -30,9 +30,11 @@ SECTION_ORDER = [
     ("MusicAlbum", "🎵 Musique"),
 ]
 
-# Garde-fou sur le poids de l'email : au-delà, les affiches restantes
-# retombent en simples liens (un email > ~5 Mo finit souvent en spam).
-MAX_EMBEDDED_POSTERS = 50
+# Garde-fou sur le poids de l'email et le ratio image/texte : au-delà, les
+# affiches restantes retombent en liens distants (jellyfin_external_url).
+# Un email lourd et très illustré est fréquemment classé en spam.
+MAX_EMBEDDED_POSTERS = 15
+TEXT_TEMPLATE = "newsletter.txt"
 
 
 def claim_campaign() -> bool:
@@ -200,6 +202,27 @@ def render_html(settings: dict, context: dict, for_email: bool = True,
     )
 
 
+def render_text(settings: dict, context: dict, with_unsub: bool = False) -> str:
+    """Version text/plain de la newsletter, construite à partir du même
+    contexte que le HTML (titres, liens, synopsis, désinscription)."""
+    if not newsletter_templates.resolve(settings)["block_map"].get("intro", {}).get("enabled", True):
+        context = {**context, "intro": ""}
+    sections = [
+        {
+            "label": section["label"],
+            "entries": [
+                {**item, "url": urls.safe_public_href(item.get("url"), fallback="")}
+                for item in section["entries"]
+            ],
+        }
+        for section in context["sections"]
+    ]
+    unsubscribe_url = mailer.UNSUB_PLACEHOLDER if with_unsub else None
+    return _env.get_template(TEXT_TEMPLATE).render(
+        **{**context, "sections": sections}, unsubscribe_url=unsubscribe_url,
+    )
+
+
 def run(trigger: str = "manual", *, _lock_already_acquired: bool = False) -> dict:
     """Pipeline complet d'envoi. Toujours journalisé dans send_logs."""
     if not _lock_already_acquired and not claim_campaign():
@@ -270,6 +293,7 @@ def _run(trigger: str) -> dict:
     } if app_url else {}
 
     html = render_html(settings, context, for_email=True, with_unsub=bool(app_url))
+    text = render_text(settings, context, with_unsub=bool(app_url))
     subject = f"{context['title']} — {datetime.date.today().strftime('%d/%m/%Y')}"
 
     errors = []
@@ -278,7 +302,7 @@ def _run(trigger: str) -> dict:
     try:
         send_result = mailer.send_html(
             settings, subscribers, subject, html,
-            _logo_path(settings), inline_images, unsub_urls,
+            _logo_path(settings), inline_images, unsub_urls, text=text,
         )
         if send_result.failures:
             errors.append(f"SMTP partiel : {send_result.failed} échec(s) ({'; '.join(send_result.failures[:5])})")

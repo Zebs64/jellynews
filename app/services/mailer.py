@@ -17,6 +17,7 @@ import ssl
 import time
 from dataclasses import dataclass, field
 from email.message import EmailMessage
+from email.utils import formataddr, formatdate, make_msgid, parseaddr
 from pathlib import Path
 
 from ..smtp_sanitizer import SMTP_TEXT_MAX, clean_smtp_text, mask_email
@@ -176,6 +177,23 @@ def smtp_diagnostic(exc: BaseException) -> dict:
     }
 
 
+def sender_header(settings: dict) -> tuple[str, str]:
+    """Retourne (en-tête From, adresse seule).
+
+    Le nom affiché vient de `smtp_sender_name` ; à défaut, d'un éventuel
+    « Nom <adresse> » déjà saisi dans `smtp_sender` (configurations anciennes).
+    Sans nom, le From reste l'adresse brute, comme avant.
+    """
+    raw = str(settings.get("smtp_sender") or settings.get("smtp_user") or "").strip()
+    legacy_name, address = parseaddr(raw)
+    if not address:
+        return raw, raw
+    name = " ".join(str(settings.get("smtp_sender_name") or legacy_name).split())
+    if not name:
+        return address, address
+    return formataddr((name, address)), address
+
+
 def _build_message(
     settings: dict,
     recipient: str,
@@ -184,20 +202,33 @@ def _build_message(
     logo_path: Path | None,
     inline_images: dict[str, tuple[bytes, str]] | None = None,
     unsub_url: str = "",
+    text: str | None = None,
 ) -> EmailMessage:
     msg = EmailMessage()
+    from_header, from_address = sender_header(settings)
+    _, _, domain = from_address.rpartition("@")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_sender") or settings.get("smtp_user", "")
+    msg["From"] = from_header
     msg["To"] = recipient
+    # Date et Message-ID ne sont ajoutés ni par EmailMessage ni par
+    # smtplib.send_message ; leur absence est pénalisée par les filtres anti-spam.
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain or None)
     if unsub_url:
         # Désinscription en un clic gérée nativement par Gmail/Outlook (RFC 8058).
         msg["List-Unsubscribe"] = f"<{unsub_url}>"
         msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
-    # Version texte de repli pour les clients sans HTML (et meilleur score spam).
-    text = "Votre client mail ne supporte pas le HTML. Consultez les nouveautés sur votre serveur Jellyfin."
-    if unsub_url:
-        text += f"\nSe désinscrire : {unsub_url}"
-    msg.set_content(text)
+    # Version texte : idéalement le même contenu que le HTML (règle anti-spam
+    # MPART_ALT_DIFF). Repli générique pour les appelants qui n'en fournissent pas.
+    if text:
+        text = text.replace(UNSUB_PLACEHOLDER, unsub_url)
+    else:
+        text = "Votre client mail ne supporte pas le HTML. Consultez les nouveautés sur votre serveur Jellyfin."
+        if unsub_url:
+            text += f"\nSe désinscrire : {unsub_url}"
+    # quoted-printable forcé : sinon les émojis/accents font choisir base64,
+    # pénalisé par certains filtres (MIME_BASE64_TEXT).
+    msg.set_content(text, cte="quoted-printable")
     msg.add_alternative(html.replace(UNSUB_PLACEHOLDER, unsub_url), subtype="html")
 
     related = msg.get_payload()[1]  # la partie HTML devient multipart/related
@@ -236,6 +267,7 @@ def send_html(
     logo_path: Path | None = None,
     inline_images: dict[str, tuple[bytes, str]] | None = None,
     unsub_urls: dict[str, str] | None = None,
+    text: str | None = None,
 ) -> SendResult:
     """Envoie le HTML à chaque destinataire, avec To unique et throttling par vagues."""
     if not settings.get("smtp_host"):
@@ -253,7 +285,7 @@ def send_html(
             try:
                 msg = _build_message(
                     settings, recipient, subject, html, logo_path,
-                    inline_images, (unsub_urls or {}).get(recipient, ""),
+                    inline_images, (unsub_urls or {}).get(recipient, ""), text,
                 )
                 server.send_message(msg)
                 sent += 1
