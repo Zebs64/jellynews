@@ -37,7 +37,7 @@ avec en option un résumé sur Discord.
   acceptés par le serveur SMTP des messages réellement livrés en inbox, et
   expose code SMTP, message neutralisé, catégorie, aide et caractère réessayable.
 - **Cache-buster applicatif** : les assets statiques modifiables portent la
-  version applicative (`?v=1.1.3`) pour éviter le hard refresh après release.
+  version applicative (`?v=1.2.0`) pour éviter le hard refresh après release.
 - **Templates newsletter** : `Classique` reste le défaut historique ; `Courant
   éditorial`, `Catalogue compact` et `Affiche de séance` sont sélectionnables
   dans l'admin, à partir de la direction Aï documentée pour v1.1.0.
@@ -66,7 +66,7 @@ JSON complète via `/api/settings/export`. Elle contient :
 - les logs d'envoi ;
 - les archives HTML des newsletters.
 
-Le fichier est nommé `jellynews-backup-v1.1.3-secrets.json` car il contient les
+Le fichier est nommé `jellynews-backup-v1.2.0-secrets.json` car il contient les
 secrets nécessaires au fonctionnement de JellyNews : clés Jellyfin, SMTP et LLM.
 Stockez-le donc comme un secret, pas comme une simple pièce jointe de support.
 
@@ -90,7 +90,7 @@ Limites importantes : l'export n'inclut pas les comptes administrateurs,
 un rollback complet, conservez toujours une copie du volume `data/` avant mise à
 jour.
 
-Voir aussi : [`docs/releases/v1.1.3.md`](docs/releases/v1.1.3.md).
+Voir aussi : [`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md).
 
 ## Démarrage
 
@@ -132,8 +132,8 @@ Puis ouvrez **http://localhost:8050** :
 2. **Jellyfin** : URL interne (ex. `http://jellyfin:8096`), clé API
    (Tableau de bord Jellyfin → Clés API). L'URL publique n'est nécessaire
    qu'en mode « lien » — le mode « incorporé » (par défaut) n'en a pas besoin.
-3. **SMTP** : hôte, port, sécurité (STARTTLS/SSL), identifiants, expéditeur,
-   taille de vague et pause entre vagues. Testez avec le bouton « Newsletter test ».
+3. **SMTP** : hôte, port, sécurité (STARTTLS/SSL), identifiants, adresse et
+   nom affiché de l'expéditeur, taille de vague et pause entre vagues. Testez avec le bouton « Newsletter test ».
    Configurez aussi SPF, DKIM et DMARC sur votre domaine d'envoi : JellyNews
    envoie proprement, mais la réputation reste celle de votre domaine SMTP.
    Ajustez les vagues selon les limites horaires et journalières de votre relais.
@@ -198,8 +198,11 @@ jellynews/
   `Classique` + blocs par défaut. L'admin consomme `/api/newsletter/templates`
   pour afficher les templates et les blocs autorisés sans accepter de HTML libre.
 - **Délivrabilité SMTP** : JellyNews envoie un message distinct par abonné,
-  sans `Cc/Bcc`, avec version texte et headers `List-Unsubscribe` quand
-  `app_public_url` est configurée. Ce comportement améliore la propreté de
+  sans `Cc/Bcc`, avec headers `Date` et `Message-ID`, From « Nom <adresse> »
+  si un nom d'expéditeur est renseigné, une version texte reprenant le contenu
+  de la newsletter (titres, synopsis, liens) et les headers `List-Unsubscribe`
+  quand `app_public_url` est configurée. Au plus 15 affiches sont incorporées ;
+  les suivantes pointent vers l'URL publique Jellyfin. Ce comportement améliore la propreté de
   l'envoi, mais ne remplace pas SPF, DKIM, DMARC ni une réputation SMTP saine.
 - **Diagnostic SMTP** : les logs enregistrent la classe d'erreur, le code SMTP,
   le message SMTP neutralisé, la catégorie, l'aide administrateur et l'indication
@@ -216,7 +219,9 @@ jellynews/
   échappe le contenu sans accepter de HTML libre.
 - **Throttling** : `smtp_batch_size` et `smtp_batch_pause_seconds` limitent
   la cadence d'envoi par vagues. Ils doivent être adaptés aux quotas du
-  fournisseur SMTP ; JellyNews ne contourne pas ces limites.
+  fournisseur SMTP ; JellyNews ne contourne pas ces limites. Une connexion SMTP
+  est ouverte par vague et une coupure entraîne une reconnexion avec un seul
+  nouvel essai par destinataire.
 - **Cache-buster** : la version applicative alimente `?v=...` sur les assets
   web modifiables. Après rollback, purgez aussi le cache d'un éventuel proxy
   frontal s'il force sa propre politique de cache.

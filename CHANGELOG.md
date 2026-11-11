@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.0 — Délivrabilité et robustesse SMTP
+
+- En-têtes `Date` et `Message-ID` ajoutés à chaque message (absents jusqu’ici, pénalisés par les filtres anti-spam).
+- Vraie partie `text/plain` générée depuis le contenu de la newsletter (titres, synopsis, liens, désinscription), encodée en quoted-printable.
+- Nom d’expéditeur optionnel (`smtp_sender_name`) : From « Nom <adresse> », rétrocompatible avec les configurations et sauvegardes existantes.
+- Affiches incorporées limitées à 15 (au lieu de 50) pour alléger l’email ; les suivantes pointent vers l’URL publique Jellyfin.
+- Connexion SMTP ouverte à chaque vague, avec reconnexion et un seul nouvel essai par destinataire en cas de coupure.
+- Logs : adresses des destinataires refusés plus jamais en clair ; refus d’accès Jellyfin (401/403) aux affiches signalés en erreur.
+- CI : tests exécutés avant tout build d’image (GitHub et Gitea) ; workflow Gitea générique (variable `REGISTRY`).
+- Version applicative, cache-buster et client Jellyfin passés en `1.2.0`.
+
+Documentation détaillée : `docs/releases/v1.2.0.md`.
+
 ## v1.1.3 — Retouche mascotte JellyNews
 
 - Mascotte JellyNews remplacée par la version corrigée fournie, avec l’enveloppe volante proprement détourée.

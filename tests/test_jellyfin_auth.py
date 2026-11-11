@@ -64,7 +64,7 @@ class JellyfinAuthHeaderTests(unittest.TestCase):
         self.assertEqual(
             headers["Authorization"],
             'MediaBrowser Client="JellyNews", Device="JellyNews", '
-            'DeviceId="jellynews", Version="1.1.3", Token="test-api-key"',
+            'DeviceId="jellynews", Version="1.2.0", Token="test-api-key"',
         )
         response.raise_for_status.assert_called_once()
 
@@ -84,7 +84,7 @@ class JellyfinAuthHeaderTests(unittest.TestCase):
         self.assertEqual(
             headers["Authorization"],
             'MediaBrowser Client="JellyNews", Device="JellyNews", '
-            'DeviceId="jellynews", Version="1.1.3", Token="test-api-key"',
+            'DeviceId="jellynews", Version="1.2.0", Token="test-api-key"',
         )
         response.raise_for_status.assert_called_once()
 
