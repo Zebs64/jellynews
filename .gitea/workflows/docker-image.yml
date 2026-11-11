@@ -1,5 +1,10 @@
 name: Build Docker image
 
+# Workflow générique : aucune instance n'est codée en dur. Le registre est
+# déduit de l'URL du serveur Gitea (ou de la variable de dépôt REGISTRY si
+# elle est définie) et l'identifiant est le propriétaire du dépôt.
+# Secret requis : REGISTRY_TOKEN (jeton avec droit d'écriture sur les paquets).
+
 on:
   push:
     branches:
@@ -12,36 +17,68 @@ permissions:
   contents: read
   packages: write
 
-env:
-  REGISTRY: gitea.example.invalid
-  IMAGE_NAME: ${{ gitea.repository }}
-
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATA_DIR: /tmp/jellynews-test-data
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run tests
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest -q
+
   docker:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve image name
+        id: image
+        env:
+          REGISTRY_OVERRIDE: ${{ vars.REGISTRY }}
+          SERVER_URL: ${{ gitea.server_url }}
+          REPOSITORY: ${{ gitea.repository }}
+        run: |
+          REGISTRY="${REGISTRY_OVERRIDE:-${SERVER_URL#*://}}"
+          REGISTRY="${REGISTRY%%/*}"
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "image=$(echo "$REGISTRY/$REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Login to Gitea registry
+        env:
+          REGISTRY: ${{ steps.image.outputs.registry }}
+          REGISTRY_USER: ${{ gitea.repository_owner }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
-          echo "${{ secrets.REGISTRY_TOKEN }}" | docker login "$REGISTRY" \
-            -u "Leia" \
-            --password-stdin
+          echo "$REGISTRY_TOKEN" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
 
-      - name: Build image
+      - name: Build and push image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          SHA: ${{ gitea.sha }}
+          REF_TYPE: ${{ gitea.ref_type }}
+          REF_NAME: ${{ gitea.ref_name }}
         run: |
-          IMAGE="$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          TAGS="$IMAGE:$SHA"
+          if [ "$REF_TYPE" = "tag" ]; then
+            TAGS="$TAGS $IMAGE:$REF_NAME"
+          else
+            TAGS="$TAGS $IMAGE:latest"
+          fi
 
-          docker build \
-            -t "$IMAGE:${{ gitea.sha }}" \
-            -t "$IMAGE:latest" \
-            .
-
-      - name: Push image
-        run: |
-          IMAGE="$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
-
-          docker push "$IMAGE:${{ gitea.sha }}"
-          docker push "$IMAGE:latest"
+          ARGS=""
+          for tag in $TAGS; do ARGS="$ARGS -t $tag"; done
+          docker build $ARGS .
+          for tag in $TAGS; do docker push "$tag"; done

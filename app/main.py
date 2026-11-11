@@ -2,6 +2,7 @@
 import ipaddress
 import logging
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
@@ -17,7 +18,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="JellyNews", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    database.init_db()
+    scheduler.start()
+    yield
+
+
+app = FastAPI(title="JellyNews", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 # NOTE CORS : le front est servi par la même origine que l'API, il n'y a donc
 # AUCUN middleware CORS à ajouter (c'est plus sûr ainsi). Si un jour vous
@@ -34,12 +43,6 @@ templates.env.globals["app_version"] = APP_VERSION
 templates.env.globals["asset_version"] = ASSET_VERSION
 
 app.include_router(api.router)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    database.init_db()
-    scheduler.start()
 
 
 # ------------------------------------------------------------------- pages --

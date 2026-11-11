@@ -1,6 +1,18 @@
-data/
+# Le Dockerfile ne copie que requirements.txt et app/ : on allège le contexte
+# de build en excluant tout le reste.
+.git/
+.gitea/
+.github/
+.claude/
 .venv/
+.pytest_cache/
 __pycache__/
 *.pyc
-.git/
+data/
+docs/
+screenshots/
+tests/
 README.md
+CHANGELOG.md
+requirements-dev.txt
+docker-compose*.yml
