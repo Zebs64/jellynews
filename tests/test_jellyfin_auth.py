@@ -10,6 +10,45 @@ SETTINGS = {
 }
 
 
+def _status_error(status: int) -> jellyfin.httpx.HTTPStatusError:
+    request = jellyfin.httpx.Request("GET", "http://jellyfin.local:8096/Items/abc/Images/Primary")
+    response = jellyfin.httpx.Response(status, request=request)
+    return jellyfin.httpx.HTTPStatusError("error", request=request, response=response)
+
+
+POSTER_ITEM = {"poster_path": "/Items/abc/Images/Primary", "name": "Film"}
+
+
+class JellyfinPosterErrorTests(unittest.TestCase):
+    def _download_with(self, side_effect):
+        response = Mock()
+        response.raise_for_status.side_effect = side_effect
+        with patch.object(jellyfin.httpx, "get", return_value=response), \
+             self.assertLogs("jellynews.jellyfin", level="WARNING") as captured:
+            result = jellyfin.download_poster(SETTINGS, POSTER_ITEM)
+        self.assertIsNone(result)
+        return captured
+
+    def test_auth_errors_are_logged_as_errors_with_hint(self):
+        for status in (401, 403):
+            with self.subTest(status=status):
+                captured = self._download_with(_status_error(status))
+                self.assertEqual(captured.records[0].levelname, "ERROR")
+                self.assertIn(f"HTTP {status}", captured.output[0])
+                self.assertIn("clé API", captured.output[0])
+                self.assertNotIn("test-api-key", "\n".join(captured.output))
+
+    def test_other_http_errors_are_warnings_with_status(self):
+        captured = self._download_with(_status_error(404))
+        self.assertEqual(captured.records[0].levelname, "WARNING")
+        self.assertIn("HTTP 404", captured.output[0])
+
+    def test_network_errors_are_warnings(self):
+        captured = self._download_with(jellyfin.httpx.ConnectError("down"))
+        self.assertEqual(captured.records[0].levelname, "WARNING")
+        self.assertIn("ConnectError", captured.output[0])
+
+
 class JellyfinAuthHeaderTests(unittest.TestCase):
     def test_get_uses_mediabrowser_authorization_header(self):
         response = Mock()

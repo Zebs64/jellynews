@@ -33,6 +33,19 @@ class FakeServer:
         self.messages.append(msg)
 
 
+class DisconnectingServer(FakeServer):
+    """Simule un serveur qui coupe la connexion avant certains envois."""
+
+    def __init__(self, disconnect_on: set[str]):
+        super().__init__()
+        self.disconnect_on = disconnect_on
+
+    def send_message(self, msg):
+        if msg["To"] in self.disconnect_on:
+            raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+        super().send_message(msg)
+
+
 class MailerTests(unittest.TestCase):
     def test_send_html_uses_one_message_per_recipient_without_cc_bcc_and_keeps_unsubscribe(self):
         fake = FakeServer()
@@ -96,6 +109,60 @@ class MailerTests(unittest.TestCase):
         self.assertEqual(result.total, 1)
         self.assertEqual(result.sent, 0)
         self.assertEqual(result.failures, ["v***@example.test: SMTPException"])
+
+    def test_send_html_opens_one_connection_per_wave(self):
+        fake = FakeServer()
+        recipients = [f"user{i}@example.test" for i in range(5)]
+
+        with patch.object(mailer, "_connect", return_value=fake) as connect, patch.object(mailer.time, "sleep") as sleep:
+            result = mailer.send_html(BASE_SETTINGS, recipients, "Sujet", "<p>Bonjour</p>")
+
+        self.assertEqual(result.sent, 5)
+        self.assertEqual(connect.call_count, 3)  # vagues de 2 : 2 + 2 + 1
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_send_html_reconnects_once_after_disconnect(self):
+        dropped = DisconnectingServer(disconnect_on={"two@example.test"})
+        fresh = FakeServer()
+        recipients = ["one@example.test", "two@example.test"]
+
+        with patch.object(mailer, "_connect", side_effect=[dropped, fresh]) as connect, patch.object(mailer.time, "sleep"):
+            result = mailer.send_html(BASE_SETTINGS, recipients, "Sujet", "<p>Bonjour</p>")
+
+        self.assertEqual(result.sent, 2)
+        self.assertEqual(result.failures, [])
+        self.assertEqual(connect.call_count, 2)
+        self.assertEqual([msg["To"] for msg in dropped.messages], ["one@example.test"])
+        self.assertEqual([msg["To"] for msg in fresh.messages], ["two@example.test"])
+
+    def test_send_html_retries_only_once_per_recipient(self):
+        always_down = DisconnectingServer(disconnect_on={"two@example.test"})
+        recipients = ["one@example.test", "two@example.test"]
+
+        with patch.object(mailer, "_connect", return_value=always_down) as connect, patch.object(mailer.time, "sleep"):
+            result = mailer.send_html(BASE_SETTINGS, recipients, "Sujet", "<p>Bonjour</p>")
+
+        self.assertEqual(result.sent, 1)
+        self.assertEqual(result.failures, ["t***@example.test: SMTPServerDisconnected"])
+        self.assertEqual(result.failure_details[0]["smtp_category"], "smtp_disconnected")
+        self.assertEqual(connect.call_count, 2)  # connexion de vague + un seul nouvel essai
+
+    def test_send_html_reconnect_failure_on_later_wave_is_isolated(self):
+        fake = FakeServer()
+        recipients = ["one@example.test", "two@example.test", "three@example.test"]
+        down = ConnectionRefusedError("refused")
+
+        with patch.object(mailer, "_connect", side_effect=[fake, down]), patch.object(mailer.time, "sleep"):
+            result = mailer.send_html(BASE_SETTINGS, recipients, "Sujet", "<p>Bonjour</p>")
+
+        self.assertEqual(result.sent, 2)
+        self.assertEqual(result.failures, ["t***@example.test: ConnectionRefusedError"])
+        self.assertEqual(result.failure_details[0]["smtp_category"], "network_error")
+
+    def test_send_html_first_connection_failure_still_raises(self):
+        with patch.object(mailer, "_connect", side_effect=smtplib.SMTPAuthenticationError(535, b"bad")):
+            with self.assertRaises(smtplib.SMTPAuthenticationError):
+                mailer.send_html(BASE_SETTINGS, ["one@example.test"], "Sujet", "<p>Bonjour</p>")
 
     def test_throttle_settings_validate_bounds(self):
         self.assertEqual(mailer.throttle_settings(BASE_SETTINGS), (2, 3))

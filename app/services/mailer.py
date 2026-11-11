@@ -9,6 +9,7 @@ CONFIDENTIALITÉ : un message distinct est envoyé à chaque abonné (pas de
 liste en clair dans le champ To/Cc), ce qui permet aussi d'injecter un lien
 de désinscription propre à chaque destinataire.
 """
+import contextlib
 import logging
 import mimetypes
 import re
@@ -269,32 +270,60 @@ def send_html(
     unsub_urls: dict[str, str] | None = None,
     text: str | None = None,
 ) -> SendResult:
-    """Envoie le HTML à chaque destinataire, avec To unique et throttling par vagues."""
+    """Envoie le HTML à chaque destinataire, avec To unique et throttling par vagues.
+
+    Une connexion SMTP est ouverte par vague : un serveur qui coupe pendant la
+    pause entre vagues n'affecte pas la suite. Si la connexion tombe en cours
+    de vague, on se reconnecte et on retente une seule fois le destinataire.
+    """
     if not settings.get("smtp_host"):
         raise RuntimeError("Serveur SMTP non configuré")
     if not recipients:
         return SendResult(total=0, sent=0, failures=[])
 
     batch_size, pause_seconds = throttle_settings(settings)
+    total = len(recipients)
     sent = 0
     failures: list[str] = []
     failure_details: list[dict] = []
-    with _connect(settings) as server:
-        total = len(recipients)
-        for index, recipient in enumerate(recipients, start=1):
+
+    def record_failure(recipient: str, exc: BaseException) -> None:
+        masked = _masked_recipient(recipient)
+        log.error("Échec d'envoi à %s", masked, exc_info=exc)
+        failures.append(f"{masked}: {type(exc).__name__}")
+        failure_details.append({"recipient": masked, **smtp_diagnostic(exc)})
+
+    for wave_start in range(0, total, batch_size):
+        wave = recipients[wave_start:wave_start + batch_size]
+        if wave_start and pause_seconds:
+            log.info("Pause SMTP %ss après %s/%s destinataires", pause_seconds, wave_start, total)
+            time.sleep(pause_seconds)
+        with contextlib.ExitStack() as stack:
             try:
-                msg = _build_message(
-                    settings, recipient, subject, html, logo_path,
-                    inline_images, (unsub_urls or {}).get(recipient, ""), text,
-                )
-                server.send_message(msg)
-                sent += 1
+                server = stack.enter_context(_connect(settings))
             except (smtplib.SMTPException, OSError) as exc:
-                masked = _masked_recipient(recipient)
-                log.exception("Échec d'envoi à %s", masked)
-                failures.append(f"{masked}: {type(exc).__name__}")
-                failure_details.append({"recipient": masked, **smtp_diagnostic(exc)})
-            if index < total and index % batch_size == 0 and pause_seconds:
-                log.info("Pause SMTP %ss après %s/%s destinataires", pause_seconds, index, total)
-                time.sleep(pause_seconds)
-    return SendResult(total=len(recipients), sent=sent, failures=failures, failure_details=failure_details)
+                if not wave_start:
+                    raise  # configuration SMTP invalide : rien n'est parti
+                log.error("Reconnexion SMTP impossible après %s/%s destinataires", wave_start, total)
+                for recipient in wave:
+                    record_failure(recipient, exc)
+                continue
+            for recipient in wave:
+                try:
+                    msg = _build_message(
+                        settings, recipient, subject, html, logo_path,
+                        inline_images, (unsub_urls or {}).get(recipient, ""), text,
+                    )
+                    try:
+                        server.send_message(msg)
+                    except smtplib.SMTPServerDisconnected:
+                        log.warning(
+                            "Connexion SMTP coupée avant l'envoi à %s : reconnexion et nouvel essai",
+                            _masked_recipient(recipient),
+                        )
+                        server = stack.enter_context(_connect(settings))
+                        server.send_message(msg)
+                    sent += 1
+                except (smtplib.SMTPException, OSError) as exc:
+                    record_failure(recipient, exc)
+    return SendResult(total=total, sent=sent, failures=failures, failure_details=failure_details)

@@ -123,9 +123,21 @@ def download_poster(settings: dict, item: dict) -> tuple[bytes, str] | None:
         content_type = resp.headers.get("content-type", "image/jpeg")
         subtype = content_type.split("/")[-1].split(";")[0] or "jpeg"
         return resp.content, subtype
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            log.error(
+                "Affiche refusée par Jellyfin (HTTP %s) pour %s : vérifier la clé API "
+                "et ses droits d'accès aux bibliothèques", status, item.get("name"),
+            )
+        else:
+            log.warning("Affiche indisponible (HTTP %s) pour %s", status, item.get("name"))
+    except httpx.HTTPError as exc:
+        log.warning("Affiche injoignable pour %s : %s", item.get("name"), type(exc).__name__)
     except Exception:
-        log.warning("Affiche introuvable pour %s", item.get("name"))
-        return None
+        # Dernier filet : une affiche ne doit jamais faire échouer la campagne.
+        log.exception("Erreur inattendue au téléchargement de l'affiche de %s", item.get("name"))
+    return None
 
 
 def fetch_recent_items(settings: dict) -> list[dict]:
