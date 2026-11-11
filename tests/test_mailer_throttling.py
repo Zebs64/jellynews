@@ -110,6 +110,25 @@ class MailerTests(unittest.TestCase):
         self.assertEqual(result.sent, 0)
         self.assertEqual(result.failures, ["v***@example.test: SMTPException"])
 
+    def test_send_html_masks_recipient_refused_by_server_in_logs(self):
+        class RefusingServer(FakeServer):
+            def send_message(self, msg):
+                raise smtplib.SMTPRecipientsRefused({
+                    msg["To"]: (550, f"5.1.1 <{msg['To']}> unknown user".encode())
+                })
+
+        with (
+            patch.object(mailer, "_connect", return_value=RefusingServer()),
+            self.assertLogs("jellynews.mailer", level="ERROR") as captured,
+        ):
+            result = mailer.send_html(BASE_SETTINGS, ["victim@example.test"], "Sujet", "<p>Bonjour</p>")
+
+        log_output = "\n".join(captured.output)
+        self.assertNotIn("victim@example.test", log_output)
+        self.assertIn("v***@example.test", log_output)
+        self.assertIn("550", log_output)
+        self.assertEqual(result.failures, ["v***@example.test: SMTPRecipientsRefused"])
+
     def test_send_html_opens_one_connection_per_wave(self):
         fake = FakeServer()
         recipients = [f"user{i}@example.test" for i in range(5)]

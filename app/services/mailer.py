@@ -289,9 +289,15 @@ def send_html(
 
     def record_failure(recipient: str, exc: BaseException) -> None:
         masked = _masked_recipient(recipient)
-        log.error("Échec d'envoi à %s", masked, exc_info=exc)
+        diagnostic = smtp_diagnostic(exc)
+        # Pas de trace brute : le texte de l'exception (ex. SMTPRecipientsRefused)
+        # contient l'adresse en clair. On journalise le diagnostic neutralisé.
+        log.error(
+            "Échec d'envoi à %s : %s %s %s", masked, diagnostic["error_class"],
+            diagnostic["smtp_code"] or "", diagnostic["smtp_error"],
+        )
         failures.append(f"{masked}: {type(exc).__name__}")
-        failure_details.append({"recipient": masked, **smtp_diagnostic(exc)})
+        failure_details.append({"recipient": masked, **diagnostic})
 
     for wave_start in range(0, total, batch_size):
         wave = recipients[wave_start:wave_start + batch_size]
@@ -304,7 +310,10 @@ def send_html(
             except (smtplib.SMTPException, OSError) as exc:
                 if not wave_start:
                     raise  # configuration SMTP invalide : rien n'est parti
-                log.error("Reconnexion SMTP impossible après %s/%s destinataires", wave_start, total)
+                log.error(
+                    "Reconnexion SMTP impossible après %s/%s destinataires : %s",
+                    wave_start, total, type(exc).__name__,
+                )
                 for recipient in wave:
                     record_failure(recipient, exc)
                 continue
